@@ -11,6 +11,9 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [userName, setUserName] = useState("")
+  const [displayName, setDisplayName] = useState("")
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
@@ -56,7 +59,7 @@ export default function AuthPage() {
         return
       }
 
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -66,9 +69,35 @@ export default function AuthPage() {
 
       if (error) {
         setError("登録に失敗しました: " + error.message)
-      } else {
-        setConfirmSent(true)
+        setLoading(false)
+        return
       }
+
+      // アバターアップロード
+      let avatarUrl = null
+      if (avatarFile && signUpData.user) {
+        const filePath = `${signUpData.user.id}/avatar.jpg`
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(filePath, avatarFile, { contentType: "image/jpeg" })
+
+        if (!uploadError) {
+          const { data } = supabase.storage.from("avatars").getPublicUrl(filePath)
+          avatarUrl = `${data.publicUrl}?t=${Date.now()}`
+        }
+      }
+
+      // usersテーブルに登録
+      if (signUpData.user) {
+        await supabase.from("users").insert({
+          id: signUpData.user.id,
+          user_name: userName,
+          display_name: displayName.trim() || userName,
+          avatar_url: avatarUrl,
+        })
+      }
+
+      setConfirmSent(true)
     }
     setLoading(false)
   }
@@ -177,12 +206,82 @@ export default function AuthPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {/* ユーザー名（新規登録のみ） */}
           {!isLogin && (
-            <input
-              placeholder="ユーザー名 (@なし)"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              style={inputStyle}
-            />
+            <>
+              <input
+                placeholder="ユーザー名 (@なし)"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                style={inputStyle}
+              />
+
+              {/* 表示名 */}
+              <input
+                placeholder="表示名（省略するとユーザー名になります）"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                style={inputStyle}
+              />
+
+              {/* アイコン選択 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                {/* プレビュー */}
+                <div style={{
+                  width: "56px", height: "56px", borderRadius: "50%",
+                  background: avatarPreview ? "transparent" : "#1d9bf0",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "22px", fontWeight: "bold", color: "#fff",
+                  overflow: "hidden", flexShrink: 0
+                }}>
+                  {avatarPreview ? (
+                    <img src={avatarPreview} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    userName[0]?.toUpperCase() || "?"
+                  )}
+                </div>
+
+                {/* ボタン */}
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    display: "block", width: "100%",
+                    background: "#222", border: "1px solid #444",
+                    borderRadius: "8px", padding: "10px",
+                    color: "#888", fontSize: "14px",
+                    cursor: "pointer", textAlign: "center",
+                    boxSizing: "border-box" as const
+                  }}>
+                    📷 アイコンを選ぶ（任意・10MB以下）
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        if (file.size > 10 * 1024 * 1024) {
+                          setError("10MB以下の画像を選んでください")
+                          return
+                        }
+                        setAvatarFile(file)
+                        const reader = new FileReader()
+                        reader.onload = () => setAvatarPreview(reader.result as string)
+                        reader.readAsDataURL(file)
+                      }}
+                    />
+                  </label>
+                  {avatarPreview && (
+                    <button
+                      onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
+                      style={{
+                        background: "none", border: "none",
+                        color: "#888", fontSize: "13px",
+                        cursor: "pointer", marginTop: "4px"
+                      }}>
+                      ✕ 削除
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
           {/* メール */}
