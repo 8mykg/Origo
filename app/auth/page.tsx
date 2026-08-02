@@ -147,7 +147,7 @@ export default function AuthPage() {
         <div style={{
           background: "#111", border: "1px solid #333",
           borderRadius: "16px", padding: "40px",
-          width: "320px", textAlign: "center"
+          width: "400px", textAlign: "center"
         }}>
           <p style={{ fontSize: "40px", margin: "0 0 16px" }}>📧</p>
           <h2 style={{ color: "#fff", marginBottom: "8px" }}>メールを確認して！</h2>
@@ -178,7 +178,7 @@ export default function AuthPage() {
     }}>
       <div style={{
         background: "#111", border: "1px solid #333",
-        borderRadius: "16px", padding: "40px", width: "320px"
+        borderRadius: "16px", padding: "40px", width: "400px"
       }}>
         <h1 style={{ color: "#fff", fontSize: "28px", marginBottom: "8px" }}>🐦 MySNS</h1>
         <p style={{ color: "#888", marginBottom: "24px" }}>
