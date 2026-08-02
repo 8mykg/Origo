@@ -73,6 +73,16 @@ export default function AuthPage() {
     setLoading(false)
   }
 
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
+    if (error) setError("Googleログインに失敗しました")
+  }
+
   const inputStyle = {
     width: "100%",
     background: "#222",
@@ -232,6 +242,35 @@ export default function AuthPage() {
               )}
             </div>
           )}
+          {/* 区切り線 */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            gap: "12px", marginTop: "16px"
+          }}>
+            <div style={{ flex: 1, height: "1px", background: "#333" }} />
+            <span style={{ color: "#888", fontSize: "13px" }}>または</span>
+            <div style={{ flex: 1, height: "1px", background: "#333" }} />
+          </div>
+
+          {/* Googleログインボタン */}
+          <button
+            onClick={handleGoogleLogin}
+            style={{
+              width: "100%", marginTop: "16px",
+              background: "#fff", color: "#000",
+              border: "none", borderRadius: "24px",
+              padding: "12px", fontWeight: "bold",
+              fontSize: "16px", cursor: "pointer",
+              display: "flex", alignItems: "center",
+              justifyContent: "center", gap: "8px"
+            }}>
+            <img
+              src="https://www.google.com/favicon.ico"
+              width="18" height="18"
+              alt="Google"
+            />
+            Googleでログイン
+          </button>
         </div>
 
         {error && (
