@@ -269,7 +269,7 @@ export default function AuthPage() {
               width="18" height="18"
               alt="Google"
             />
-            Googleでログイン
+            Googleで{isLogin ? "ログイン" : "登録"}
           </button>
         </div>
 
