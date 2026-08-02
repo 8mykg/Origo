@@ -180,7 +180,7 @@ export default function AuthPage() {
         background: "#111", border: "1px solid #333",
         borderRadius: "16px", padding: "40px", width: "400px"
       }}>
-        <h1 style={{ color: "#fff", fontSize: "28px", marginBottom: "8px" }}>🐦 MySNS</h1>
+        <h1 style={{ color: "#fff", fontSize: "28px", marginBottom: "8px" }}>Origo </h1>
         <p style={{ color: "#888", marginBottom: "24px" }}>
           {isLogin ? "おかえり！" : "はじめまして！"}
         </p>
@@ -216,7 +216,7 @@ export default function AuthPage() {
 
               {/* 表示名 */}
               <input
-                placeholder="表示名（省略するとユーザー名になります）"
+                placeholder="表示名（省略するとユーザー名に置換）"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 style={inputStyle}
