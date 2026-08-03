@@ -268,17 +268,17 @@ export default function Home() {
                 キャンセル
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ color: replyInput.length > 140 ? "#f00" : "#888", fontSize: "14px" }}>
-                  {140 - replyInput.length}
+                <span style={{ color: replyInput.length > 300 ? "#f00" : "#888", fontSize: "14px" }}>
+                  {300 - replyInput.length}
                 </span>
                 <button
                   onClick={handleReply}
-                  disabled={!replyInput.trim() || replyInput.length > 140}
+                  disabled={!replyInput.trim() || replyInput.length > 300}
                   style={{
-                    background: !replyInput.trim() || replyInput.length > 140 ? "#555" : "#1d9bf0",
+                    background: !replyInput.trim() || replyInput.length > 300 ? "#555" : "#1d9bf0",
                     color: "white", border: "none", borderRadius: "24px",
                     padding: "8px 20px", fontWeight: "bold",
-                    cursor: !replyInput.trim() || replyInput.length > 140 ? "not-allowed" : "pointer"
+                    cursor: !replyInput.trim() || replyInput.length > 300 ? "not-allowed" : "pointer"
                   }}>
                   返信する
                 </button>
@@ -297,10 +297,9 @@ export default function Home() {
         flexShrink: 0
       }}>
         {/* ロゴ */}
-        <div style={{ padding: "12px 16px", marginBottom: "8px" }}>
-          <img src="/logo-compact.svg" alt="Origo" style={{ height: "40px", width: "auto" }} />
+        <div style={{ padding: "0px 0px", marginBottom: "12px" }}>
+          <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
         </div>
-
         {/* ナビ */}
         <nav style={{ flex: 1 }}>
           {navItems.map((item) => (
@@ -327,7 +326,7 @@ export default function Home() {
                   padding: "2px 8px", borderRadius: "10px",
                   border: "1px solid #1d9bf040"
                 }}>
-                  近日公開
+                  開発中
                 </span>
               )}
             </button>
@@ -348,13 +347,12 @@ export default function Home() {
         </nav>
 
         {/* ユーザー情報 */}
-        <button
-          onClick={handleLogout}
+        <div
           style={{
             display: "flex", alignItems: "center", gap: "12px",
             background: "none", border: "none", color: "#fff",
             borderRadius: "12px", padding: "12px",
-            cursor: "pointer", width: "100%", textAlign: "left"
+            width: "100%", textAlign: "left"
           }}>
           <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} size={40} />
           <div style={{ flex: 1, overflow: "hidden" }}>
@@ -363,8 +361,15 @@ export default function Home() {
             </p>
             <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>@{currentUser?.user_name}</p>
           </div>
-          <span style={{ color: "#888" }}>↩</span>
-        </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "none", border: "none", color: "#888",
+              cursor: "pointer", padding: "4px"
+            }}>
+            ↩
+          </button>
+        </div>
       </div>
 
       {/* メインフィード */}
@@ -380,7 +385,7 @@ export default function Home() {
           <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: 0 }}>ホーム</h1>
         </div>
 
-        {/* 近日公開タブが選ばれたとき */}
+        {/* 開発中タブが選ばれたとき */}
         {activeTab !== "home" && (
           <div style={{
             display: "flex", flexDirection: "column",
@@ -388,7 +393,7 @@ export default function Home() {
             padding: "80px 20px", color: "#888", textAlign: "center"
           }}>
             <p style={{ fontSize: "40px", margin: "0 0 16px" }}>🚧</p>
-            <p style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", margin: "0 0 8px" }}>近日公開！</p>
+            <p style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", margin: "0 0 8px" }}>開発中！</p>
             <p style={{ fontSize: "15px" }}>この機能は現在開発中です。お楽しみに！</p>
             <button
               onClick={() => setActiveTab("home")}
@@ -423,17 +428,17 @@ export default function Home() {
                   rows={3}
                 />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #333", paddingTop: "12px" }}>
-                  <span style={{ color: input.length > 140 ? "#f00" : "#888", fontSize: "14px" }}>
-                    {140 - input.length}
+                  <span style={{ color: input.length > 300 ? "#f00" : "#888", fontSize: "14px" }}>
+                    {300 - input.length}
                   </span>
                   <button
                     onClick={handlePost}
-                    disabled={!input.trim() || input.length > 140}
+                    disabled={!input.trim() || input.length > 300}
                     style={{
-                      background: !input.trim() || input.length > 140 ? "#555" : "#1d9bf0",
+                      background: !input.trim() || input.length > 300 ? "#555" : "#1d9bf0",
                       color: "white", border: "none", borderRadius: "24px",
                       padding: "8px 20px", fontWeight: "bold",
-                      fontSize: "15px", cursor: !input.trim() || input.length > 140 ? "not-allowed" : "pointer"
+                      fontSize: "15px", cursor: !input.trim() || input.length > 300 ? "not-allowed" : "pointer"
                     }}>
                     投稿する
                   </button>
@@ -503,7 +508,7 @@ export default function Home() {
         <div style={{ position: "relative", marginBottom: "16px" }}>
           <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>🔍</span>
           <input
-            placeholder="検索（近日公開）"
+            placeholder="検索（開発中）"
             disabled
             style={{
               width: "100%", background: "#111",
@@ -528,14 +533,14 @@ export default function Home() {
             ))}
           </div>
           <button style={{ background: "none", border: "none", color: "#1d9bf0", cursor: "not-allowed", fontSize: "14px", marginTop: "12px", padding: 0 }}>
-            もっと見る（近日公開）
+            もっと見る（開発中）
           </button>
         </div>
 
         {/* おすすめユーザー */}
         <div style={{ background: "#111", borderRadius: "16px", padding: "16px" }}>
           <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
-          <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>フォロー機能は近日公開！</p>
+          <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>フォロー機能は開発中！</p>
         </div>
       </div>
 

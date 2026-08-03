@@ -316,7 +316,7 @@ export default function ProfilePage() {
                   background: "#1d9bf020", color: "#1d9bf0",
                   padding: "2px 8px", borderRadius: "10px",
                   border: "1px solid #1d9bf040"
-                }}>近日公開</span>
+                }}>開発中</span>
               )}
             </button>
           ))}
