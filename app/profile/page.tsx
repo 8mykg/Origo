@@ -10,6 +10,7 @@ type User = {
   display_name: string
   bio: string
   created_at: string
+  avatar_url?: string
 }
 
 type Post = {
@@ -29,6 +30,11 @@ export default function ProfilePage() {
   const [userName, setUserName] = useState("")
   const [newUserName, setNewUserName] = useState("")
   const [bio, setBio] = useState("")
+  const [followersCount, setFollowersCount] = useState(0)
+  const [followingCount, setFollowingCount] = useState(0)
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [isOwnProfile, setIsOwnProfile] = useState(true)
+  const [viewingUser, setViewingUser] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -36,25 +42,55 @@ export default function ProfilePage() {
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        window.location.href = "/auth"
-        return
-      }
+      if (!session) { window.location.href = "/auth"; return }
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", session.user.id)
-        .single()
+      const { data: myData } = await supabase
+        .from("users").select("*").eq("id", session.user.id).single()
 
-      if (userData) {
-        setUser(userData)
-        setAvatarUrl(userData.avatar_url || null)
-        setUserName(userData.user_name)
-        setNewUserName(userData.user_name)
-        setDisplayName(userData.display_name || "")
-        setBio(userData.bio || "")
-        fetchPosts(userData.user_name)
+      if (!myData) { window.location.href = "/"; return }
+
+      // URLパラメータで他人のプロフィールかチェック
+      const params = new URLSearchParams(window.location.search)
+      const targetUser = params.get("user")
+
+      if (targetUser && targetUser !== myData.user_name) {
+        // 他人のプロフィール
+        setIsOwnProfile(false)
+        setViewingUser(targetUser)
+
+        const { data: targetData } = await supabase
+          .from("users").select("*").eq("user_name", targetUser).single()
+
+        if (targetData) {
+          setUser(targetData)
+          setUserName(targetData.user_name)
+          setDisplayName(targetData.display_name || "")
+          setBio(targetData.bio || "")
+          setAvatarUrl(targetData.avatar_url || null)
+        }
+
+        // フォロー状態チェック
+        const { data: followData } = await supabase
+          .from("follows")
+          .select("*")
+          .eq("follower_name", myData.user_name)
+          .eq("following_name", targetUser)
+          .single()
+
+        setIsFollowing(!!followData)
+        fetchFollowCounts(targetUser)
+        fetchPosts(targetUser)
+      } else {
+        // 自分のプロフィール
+        setIsOwnProfile(true)
+        setUser(myData)
+        setUserName(myData.user_name)
+        setNewUserName(myData.user_name)
+        setDisplayName(myData.display_name || "")
+        setBio(myData.bio || "")
+        setAvatarUrl(myData.avatar_url || null)
+        fetchFollowCounts(myData.user_name)
+        fetchPosts(myData.user_name)
       }
       setLoading(false)
     }
@@ -75,6 +111,39 @@ export default function ProfilePage() {
         liked: likesData?.some((l) => l.post_id === post.id && l.user_name === name),
       }))
       setPosts(merged)
+    }
+  }
+
+  const fetchFollowCounts = async (name: string) => {
+    const { data: followers } = await supabase
+      .from("follows").select("*").eq("following_name", name)
+    const { data: following } = await supabase
+      .from("follows").select("*").eq("follower_name", name)
+
+    setFollowersCount(followers?.length || 0)
+    setFollowingCount(following?.length || 0)
+  }
+
+  const handleFollow = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const { data: myData } = await supabase
+      .from("users").select("*").eq("id", session.user.id).single()
+
+    if (isFollowing) {
+      await supabase.from("follows").delete()
+        .eq("follower_name", myData.user_name)
+        .eq("following_name", userName)
+      setIsFollowing(false)
+      setFollowersCount((c) => c - 1)
+    } else {
+      await supabase.from("follows").insert({
+        follower_name: myData.user_name,
+        following_name: userName,
+      })
+      setIsFollowing(true)
+      setFollowersCount((c) => c + 1)
     }
   }
 
@@ -319,44 +388,58 @@ export default function ProfilePage() {
               userName={userName}
               onUploadComplete={(url) => setAvatarUrl(url)}
             />
-            {!editing ? (
-              <button
-                onClick={() => setEditing(true)}
-                style={{
-                  background: "none", border: "1px solid #555",
-                  color: "#fff", borderRadius: "20px",
-                  padding: "8px 16px", cursor: "pointer", fontWeight: "bold"
-                }}>
-                編集
-              </button>
-            ) : (
-              <div style={{ display: "flex", gap: "8px" }}>
+            {isOwnProfile ? (
+              !editing ? (
                 <button
-                  onClick={() => {
-                    setEditing(false)
-                    setNewUserName(userName)
-                    setDisplayName(user?.display_name || "")
-                    setBio(user?.bio || "")
-                    setError("")
-                  }}
+                  onClick={() => setEditing(true)}
                   style={{
                     background: "none", border: "1px solid #555",
-                    color: "#888", borderRadius: "20px",
+                    color: "#fff", borderRadius: "20px",
                     padding: "8px 16px", cursor: "pointer", fontWeight: "bold"
                   }}>
-                  キャンセル
+                  編集
                 </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  style={{
-                    background: saving ? "#555" : "#1d9bf0",
-                    border: "none", color: "#fff", borderRadius: "20px",
-                    padding: "8px 16px", cursor: saving ? "not-allowed" : "pointer", fontWeight: "bold"
-                  }}>
-                  {saving ? "保存中..." : "保存"}
-                </button>
-              </div>
+              ) : (
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={() => {
+                      setEditing(false)
+                      setNewUserName(userName)
+                      setDisplayName(user?.display_name || "")
+                      setBio(user?.bio || "")
+                      setError("")
+                    }}
+                    style={{
+                      background: "none", border: "1px solid #555",
+                      color: "#888", borderRadius: "20px",
+                      padding: "8px 16px", cursor: "pointer", fontWeight: "bold"
+                    }}>
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    style={{
+                      background: saving ? "#555" : "#1d9bf0",
+                      border: "none", color: "#fff", borderRadius: "20px",
+                      padding: "8px 16px", cursor: saving ? "not-allowed" : "pointer", fontWeight: "bold"
+                    }}>
+                    {saving ? "保存中..." : "保存"}
+                  </button>
+                </div>
+              )
+            ) : (
+              <button
+                onClick={handleFollow}
+                style={{
+                  background: isFollowing ? "none" : "#fff",
+                  border: isFollowing ? "1px solid #555" : "none",
+                  color: isFollowing ? "#fff" : "#000",
+                  borderRadius: "20px", padding: "8px 20px",
+                  cursor: "pointer", fontWeight: "bold", fontSize: "15px"
+                }}>
+                {isFollowing ? "フォロー中" : "フォローする"}
+              </button>
             )}
           </div>
 
@@ -412,10 +495,27 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div>
-              <p style={{ margin: "0 0 4px", fontWeight: "bold", fontSize: "18px" }}>{user?.display_name || userName}</p>
+              <p style={{ margin: "0 0 4px", fontWeight: "bold", fontSize: "18px" }}>
+                {user?.display_name || userName}
+              </p>
               <p style={{ margin: "0 0 8px", color: "#888", fontSize: "14px" }}>@{userName}</p>
-              {user?.bio && <p style={{ margin: "0 0 8px", fontSize: "15px" }}>{user.bio}</p>}
-              <p style={{ margin: 0, color: "#888", fontSize: "13px" }}>登録日: {user ? formatDate(user.created_at) : ""}</p>
+              {user?.bio && <p style={{ margin: "0 0 12px", fontSize: "15px" }}>{user.bio}</p>}
+
+              {/* フォロー数 */}
+              <div style={{ display: "flex", gap: "20px", marginBottom: "12px" }}>
+                <span style={{ fontSize: "14px" }}>
+                  <strong>{followingCount}</strong>
+                  <span style={{ color: "#888", marginLeft: "4px" }}>フォロー中</span>
+                </span>
+                <span style={{ fontSize: "14px" }}>
+                  <strong>{followersCount}</strong>
+                  <span style={{ color: "#888", marginLeft: "4px" }}>フォロワー</span>
+                </span>
+              </div>
+
+              <p style={{ margin: 0, color: "#888", fontSize: "13px" }}>
+                登録日: {user ? formatDate(user.created_at) : ""}
+              </p>
             </div>
           )}
         </div>
