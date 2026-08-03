@@ -18,6 +18,7 @@ type Post = {
   content: string
   created_at: string
   likes?: number
+  liked?: boolean
 }
 
 export default function ProfilePage() {
@@ -62,19 +63,16 @@ export default function ProfilePage() {
 
   const fetchPosts = async (name: string) => {
     const { data: postsData } = await supabase
-      .from("posts")
-      .select("*")
-      .eq("user_name", name)
+      .from("posts").select("*").eq("user_name", name)
       .order("created_at", { ascending: false })
 
-    const { data: likesData } = await supabase
-      .from("likes")
-      .select("*")
+    const { data: likesData } = await supabase.from("likes").select("*")
 
     if (postsData) {
       const merged = postsData.map((post) => ({
         ...post,
         likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
+        liked: likesData?.some((l) => l.post_id === post.id && l.user_name === name),
       }))
       setPosts(merged)
     }
@@ -143,6 +141,16 @@ export default function ProfilePage() {
     setSaving(false)
   }
 
+  const handleLike = async (post: Post) => {
+    if (post.liked) {
+      await supabase.from("likes").delete()
+        .eq("post_id", post.id).eq("user_name", userName)
+    } else {
+      await supabase.from("likes").insert({ post_id: post.id, user_name: userName })
+    }
+    fetchPosts(userName)
+  }
+
   const formatDate = (str: string) => {
     const d = new Date(str)
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
@@ -187,6 +195,21 @@ export default function ProfilePage() {
                   <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
               ), label: "ホーム", action: () => window.location.href = "/"
+            },
+            {
+              icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+              ), label: "通知", action: () => { }, soon: true
+            },
+            {
+              icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+              ), label: "ブックマーク", action: () => { }, soon: true
             },
             {
               icon: (
@@ -418,7 +441,18 @@ export default function ProfilePage() {
                 <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
               </div>
               <p style={{ margin: "0 0 8px", fontSize: "15px", lineHeight: "1.5" }}>{post.content}</p>
-              <span style={{ color: "#888", fontSize: "13px" }}>❤️ {post.likes}</span>
+              <button
+                onClick={() => handleLike(post)}
+                style={{
+                  background: "none", border: "none",
+                  cursor: "pointer",
+                  color: post.liked ? "#f91880" : "#888",
+                  fontSize: "14px", display: "flex",
+                  alignItems: "center", gap: "6px",
+                  padding: "4px 8px", borderRadius: "20px"
+                }}>
+                {post.liked ? "❤️" : "🤍"} {post.likes}
+              </button>
             </div>
           </div>
         ))}
