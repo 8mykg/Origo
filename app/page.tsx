@@ -115,11 +115,63 @@ export default function Home() {
   )
 
   const navItems = [
-    { id: "home", icon: "🏠", label: "ホーム", action: () => setActiveTab("home") },
-    { id: "notifications", icon: "🔔", label: "通知", action: () => setActiveTab("notifications"), soon: true },
-    { id: "bookmarks", icon: "🔖", label: "ブックマーク", action: () => setActiveTab("bookmarks"), soon: true },
-    { id: "profile", icon: "👤", label: "プロフィール", action: () => window.location.href = "/profile" },
-    { id: "settings", icon: "⚙️", label: "設定", action: () => setActiveTab("settings"), soon: true },
+    {
+      id: "home",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      ),
+      label: "ホーム",
+      action: () => setActiveTab("home")
+    },
+    {
+      id: "notifications",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      ),
+      label: "通知",
+      action: () => setActiveTab("notifications"),
+      soon: true
+    },
+    {
+      id: "bookmarks",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+        </svg>
+      ),
+      label: "ブックマーク",
+      action: () => setActiveTab("bookmarks"),
+      soon: true
+    },
+    {
+      id: "profile",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      ),
+      label: "プロフィール",
+      action: () => window.location.href = "/profile"
+    },
+    {
+      id: "settings",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      ),
+      label: "設定",
+      action: () => setActiveTab("settings"),
+      soon: true
+    },
   ]
 
   if (loading) return (
@@ -129,18 +181,23 @@ export default function Home() {
   )
 
   return (
-    <div style={{ minHeight: "100vh", background: "#000", fontFamily: "sans-serif", color: "#fff", display: "flex", justifyContent: "center" }}>
+    <div style={{
+      minHeight: "100vh", background: "#000",
+      fontFamily: "sans-serif", color: "#fff",
+      display: "flex", justifyContent: "space-between"
+    }}>
 
       {/* 左サイドバー */}
       <div style={{
         width: "260px", padding: "20px 12px",
         position: "sticky", top: 0, height: "100vh",
         display: "flex", flexDirection: "column",
-        borderRight: "1px solid #333"
+        borderRight: "1px solid #333",
+        flexShrink: 0
       }}>
         {/* ロゴ */}
-        <div style={{ fontSize: "24px", fontWeight: "bold", padding: "12px 16px", marginBottom: "8px" }}>
-          🐦 Origo
+        <div style={{ padding: "12px 16px", marginBottom: "8px" }}>
+          <img src="/logo-compact.svg" alt="Origo" style={{ height: "40px", width: "auto" }} />
         </div>
 
         {/* ナビ */}
@@ -210,7 +267,7 @@ export default function Home() {
       </div>
 
       {/* メインフィード */}
-      <div style={{ flex: 1, maxWidth: "600px", borderRight: "1px solid #333" }}>
+      <div style={{ flex: 1, borderRight: "1px solid #333", borderLeft: "1px solid #333" }}>
         {/* ヘッダー */}
         <div style={{
           position: "sticky", top: 0,
@@ -316,7 +373,12 @@ export default function Home() {
       </div>
 
       {/* 右サイドバー */}
-      <div style={{ width: "320px", padding: "20px 16px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
+      <div style={{
+        width: "320px", padding: "20px 16px",
+        position: "sticky", top: 0, height: "100vh",
+        overflowY: "auto", flexShrink: 0,
+        borderLeft: "1px solid #333"
+      }}>
         {/* 検索欄 */}
         <div style={{ position: "relative", marginBottom: "16px" }}>
           <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>🔍</span>
