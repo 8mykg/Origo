@@ -246,7 +246,7 @@ export default function ProfilePage() {
 
       {/* 左サイドバー */}
       <div style={{
-        width: "260px", padding: "20px 12px",
+        width: "280px", padding: "20px 12px",
         position: "sticky", top: 0, height: "100vh",
         display: "flex", flexDirection: "column",
         borderRight: "1px solid #333", flexShrink: 0

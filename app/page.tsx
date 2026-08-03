@@ -12,6 +12,8 @@ type Post = {
   likes?: number
   liked?: boolean
   avatar_url?: string
+  reply_to?: string | null
+  reply_count?: number
 }
 
 type User = {
@@ -23,6 +25,8 @@ type User = {
 
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([])
+  const [replyingTo, setReplyingTo] = useState<Post | null>(null)
+  const [replyInput, setReplyInput] = useState("")
   const [input, setInput] = useState("")
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -86,6 +90,24 @@ export default function Home() {
     } else {
       await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
     }
+    fetchPosts()
+  }
+
+  const handleReply = async () => {
+    if (!replyInput.trim() || !currentUser || !replyingTo) return
+    await supabase.from("posts").insert({
+      user_name: currentUser.user_name,
+      content: replyInput,
+      reply_to: replyingTo.id,
+    })
+
+    // リプライ数を更新
+    await supabase.from("posts")
+      .update({ reply_count: (replyingTo.reply_count || 0) + 1 })
+      .eq("id", replyingTo.id)
+
+    setReplyInput("")
+    setReplyingTo(null)
     fetchPosts()
   }
 
@@ -187,9 +209,88 @@ export default function Home() {
       display: "flex", justifyContent: "space-between"
     }}>
 
+      {/* リプライモーダル */}
+      {replyingTo && (
+        <div style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.7)",
+          zIndex: 1000, display: "flex",
+          alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            background: "#111", border: "1px solid #333",
+            borderRadius: "16px", padding: "24px",
+            width: "500px", maxWidth: "90vw"
+          }}>
+            {/* 元の投稿 */}
+            <div style={{ display: "flex", gap: "12px", marginBottom: "16px", opacity: 0.7 }}>
+              <Avatar url={replyingTo.avatar_url} name={replyingTo.user_name} size={36} />
+              <div>
+                <span style={{ fontWeight: "bold", fontSize: "14px" }}>{replyingTo.display_name}</span>
+                <span style={{ color: "#888", fontSize: "13px", marginLeft: "8px" }}>@{replyingTo.user_name}</span>
+                <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#ccc" }}>{replyingTo.content}</p>
+              </div>
+            </div>
+
+            <div style={{ borderLeft: "2px solid #333", marginLeft: "18px", paddingLeft: "16px", marginBottom: "16px" }}>
+              <span style={{ color: "#888", fontSize: "13px" }}>返信先: @{replyingTo.user_name}</span>
+            </div>
+
+            {/* リプライ入力 */}
+            <div style={{ display: "flex", gap: "12px" }}>
+              <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} size={36} />
+              <textarea
+                placeholder={`@${replyingTo.user_name}に返信`}
+                value={replyInput}
+                onChange={(e) => setReplyInput(e.target.value)}
+                autoFocus
+                style={{
+                  flex: 1, background: "transparent",
+                  border: "none", outline: "none",
+                  fontSize: "16px", resize: "none",
+                  color: "#fff", minHeight: "80px"
+                }}
+                rows={3}
+              />
+            </div>
+
+            <div style={{
+              display: "flex", justifyContent: "space-between",
+              alignItems: "center", marginTop: "16px",
+              borderTop: "1px solid #333", paddingTop: "12px"
+            }}>
+              <button
+                onClick={() => { setReplyingTo(null); setReplyInput("") }}
+                style={{
+                  background: "none", border: "none",
+                  color: "#888", cursor: "pointer", fontSize: "14px"
+                }}>
+                キャンセル
+              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ color: replyInput.length > 140 ? "#f00" : "#888", fontSize: "14px" }}>
+                  {140 - replyInput.length}
+                </span>
+                <button
+                  onClick={handleReply}
+                  disabled={!replyInput.trim() || replyInput.length > 140}
+                  style={{
+                    background: !replyInput.trim() || replyInput.length > 140 ? "#555" : "#1d9bf0",
+                    color: "white", border: "none", borderRadius: "24px",
+                    padding: "8px 20px", fontWeight: "bold",
+                    cursor: !replyInput.trim() || replyInput.length > 140 ? "not-allowed" : "pointer"
+                  }}>
+                  返信する
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 左サイドバー */}
       <div style={{
-        width: "260px", padding: "20px 12px",
+        width: "280px", padding: "20px 12px",
         position: "sticky", top: 0, height: "100vh",
         display: "flex", flexDirection: "column",
         borderRight: "1px solid #333",
@@ -355,16 +456,35 @@ export default function Home() {
                     <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
                   </div>
                   <p style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5" }}>{post.content}</p>
-                  <button
-                    onClick={() => handleLike(post)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      color: post.liked ? "#f91880" : "#888",
-                      fontSize: "14px", display: "flex", alignItems: "center",
-                      gap: "6px", padding: "4px 8px", borderRadius: "20px"
-                    }}>
-                    {post.liked ? "❤️" : "🤍"} {post.likes}
-                  </button>
+                  <div style={{ display: "flex", gap: "16px" }}>
+                    {/* リプライボタン */}
+                    <button
+                      onClick={() => setReplyingTo(post)}
+                      style={{
+                        background: "none", border: "none",
+                        cursor: "pointer", color: "#888",
+                        fontSize: "14px", display: "flex",
+                        alignItems: "center", gap: "6px",
+                        padding: "4px 8px", borderRadius: "20px"
+                      }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                      {post.reply_count || 0}
+                    </button>
+
+                    {/* いいねボタン */}
+                    <button
+                      onClick={() => handleLike(post)}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: post.liked ? "#f91880" : "#888",
+                        fontSize: "14px", display: "flex", alignItems: "center",
+                        gap: "6px", padding: "4px 8px", borderRadius: "20px"
+                      }}>
+                      {post.liked ? "❤️" : "🤍"} {post.likes}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
