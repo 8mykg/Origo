@@ -16,10 +16,14 @@ type User = {
 type Post = {
   id: string
   user_name: string
+  display_name: string
   content: string
   created_at: string
   likes?: number
   liked?: boolean
+  avatar_url?: string
+  reply_to?: string | null
+  reply_count?: number
 }
 
 export default function ProfilePage() {
@@ -251,8 +255,8 @@ export default function ProfilePage() {
         display: "flex", flexDirection: "column",
         borderRight: "1px solid #333", flexShrink: 0
       }}>
-        <div style={{ padding: "12px 16px", marginBottom: "8px" }}>
-          <img src="/logo-compact.svg" alt="Origo" style={{ height: "40px", width: "auto" }} />
+        <div style={{ padding: "0px 0px", marginBottom: "12px" }}>
+          <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
         </div>
 
         <nav style={{ flex: 1 }}>
