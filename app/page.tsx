@@ -494,11 +494,6 @@ export default function Home() {
                       </svg>
                       {post.reply_count || 0}
                     </button>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
-                      <strong style={{ fontSize: "15px" }}>{post.display_name}</strong>
-                      <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
-                      <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
-
                       {/* 自分の投稿だけ削除ボタン表示 */}
                       {post.user_name === currentUser?.user_name && (
                         <button
@@ -520,7 +515,6 @@ export default function Home() {
                           </svg>
                         </button>
                       )}
-                    </div>
                   </div>
                 </div>
               </div>
