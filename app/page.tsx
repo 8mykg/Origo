@@ -466,19 +466,19 @@ export default function Home() {
                     <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
                     <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
                   </div>
-                  {/* いいねボタン */}
-                  <button
-                    onClick={() => handleLike(post)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      color: post.liked ? "#f91880" : "#888",
-                      fontSize: "14px", display: "flex", alignItems: "center",
-                      gap: "6px", padding: "4px 8px", borderRadius: "20px"
-                    }}>
-                    {post.liked ? "❤️" : "🤍"} {post.likes}
-                  </button>
                   <p style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5" }}>{post.content}</p>
                   <div style={{ display: "flex", gap: "16px" }}>
+                    {/* いいねボタン */}
+                    <button
+                      onClick={() => handleLike(post)}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: post.liked ? "#f91880" : "#888",
+                        fontSize: "14px", display: "flex", alignItems: "center",
+                        gap: "6px", padding: "4px 8px", borderRadius: "20px"
+                      }}>
+                      {post.liked ? "❤️" : "🤍"} {post.likes}
+                    </button>
                     {/* リプライボタン */}
                     <button
                       onClick={() => setReplyingTo(post)}
@@ -494,27 +494,27 @@ export default function Home() {
                       </svg>
                       {post.reply_count || 0}
                     </button>
-                      {/* 自分の投稿だけ削除ボタン表示 */}
-                      {post.user_name === currentUser?.user_name && (
-                        <button
-                          onClick={() => handleDelete(post.id)}
-                          style={{
-                            marginLeft: "auto", background: "none",
-                            border: "none", cursor: "pointer",
-                            color: "#555", padding: "2px 6px",
-                            borderRadius: "4px", fontSize: "13px"
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
-                          onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                            <path d="M10 11v6M14 11v6" />
-                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                          </svg>
-                        </button>
-                      )}
+                    {/* 自分の投稿だけ削除ボタン表示 */}
+                    {post.user_name === currentUser?.user_name && (
+                      <button
+                        onClick={() => handleDelete(post.id)}
+                        style={{
+                          marginLeft: "auto", background: "none",
+                          border: "none", cursor: "pointer",
+                          color: "#555", padding: "2px 6px",
+                          borderRadius: "4px", fontSize: "13px"
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
+                        onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6M14 11v6" />
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
