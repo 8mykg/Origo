@@ -376,7 +376,7 @@ const fetchPosts = async (targetUserName: string) => {
           }}>
             {/* 元の投稿 */}
             <div style={{ display: "flex", gap: "12px", marginBottom: "16px", opacity: 0.7 }}>
-              <Avatar url={replyingTo.avatar_url} name={replyingTo.user_name} size={36} />
+              <Avatar url={avatarUrl} name={replyingTo.user_name} size={36} />
               <div>
                 <span style={{ fontWeight: "bold", fontSize: "14px" }}>{replyingTo.display_name}</span>
                 <span style={{ color: "#888", fontSize: "13px", marginLeft: "8px" }}>@{replyingTo.user_name}</span>
