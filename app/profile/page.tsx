@@ -305,8 +305,17 @@ export default function ProfilePage() {
   }
 
   const handleDelete = async (postId: string) => {
-    if (!confirm("この投稿を削除しますか？")) return
-    await supabase.from("posts").delete().eq("id", postId)
+
+    await supabase.from("likes").delete().eq("post_id", postId)
+
+    const { error } = await supabase.from("posts").delete().eq("id", postId)
+
+    if (error) {
+      console.error("削除失敗:", error.message)
+      alert("削除できませんでした: " + error.message)
+      return
+    }
+
     fetchPosts(userName)
   }
 

@@ -123,8 +123,17 @@ export default function Home() {
   }
 
   const handleDelete = async (postId: string) => {
-    if (!confirm("この投稿を削除しますか？")) return
-    await supabase.from("posts").delete().eq("id", postId)
+
+    await supabase.from("likes").delete().eq("post_id", postId)
+
+    const { error } = await supabase.from("posts").delete().eq("id", postId)
+
+    if (error) {
+      console.error("削除失敗:", error.message)
+      alert("削除できませんでした: " + error.message)
+      return
+    }
+
     fetchPosts()
   }
 
@@ -579,13 +588,13 @@ export default function Home() {
           <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
           <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>フォロー機能は開発中！</p>
         </div>
-              <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
-        Copyright © 2026 
-        <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
-          tumayouzi_Dev.
-        </a>
-         All rights reserved.
-      </p>
+        <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
+          Copyright © 2026
+          <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
+            tumayouzi_Dev.
+          </a>
+          All rights reserved.
+        </p>
       </div>}
       {/* 下部ナビ（スマホのみ） */}
       {isMobile && (
