@@ -68,7 +68,7 @@ export default function ProfilePage() {
         .from("users").select("*").eq("id", session.user.id).single()
 
       if (!myData) { window.location.href = "/"; return }
-
+      setCurrentUser(myData)
       // URLパラメータで他人のプロフィールかチェック
       const params = new URLSearchParams(window.location.search)
       const targetUser = params.get("user")
@@ -276,17 +276,17 @@ export default function ProfilePage() {
   const handleLike = async (post: Post) => {
     if (post.liked) {
       await supabase.from("likes").delete()
-        .eq("post_id", post.id).eq("user_name", userName)
+        .eq("post_id", post.id).eq("user_name", currentUser?.user_name)
     } else {
-      await supabase.from("likes").insert({ post_id: post.id, user_name: userName })
+      await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser?.user_name})
     }
     fetchPosts(userName)
   }
 
   const handleReply = async () => {
-    if (!replyInput.trim() || !userName || !replyingTo) return
+    if (!replyInput.trim() || !currentUser?.user_name || !replyingTo) return
     await supabase.from("posts").insert({
-      user_name: userName,
+      user_name: currentUser.user_name,
       content: replyInput,
       reply_to: replyingTo.id,
     })
@@ -375,7 +375,7 @@ export default function ProfilePage() {
             </div>
 
             <div style={{ borderLeft: "2px solid #333", marginLeft: "18px", paddingLeft: "16px", marginBottom: "16px" }}>
-              <span style={{ color: "#888", fontSize: "13px" }}>返信元:返信先|@{userName}:{replyingTo.user_name}</span>
+              <span style={{ color: "#888", fontSize: "13px" }}>返信先:@{replyingTo.user_name}</span>
             </div>
 
             {/* リプライ入力 */}
