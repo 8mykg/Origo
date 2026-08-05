@@ -117,23 +117,33 @@ export default function ProfilePage() {
     init()
   }, [])
 
+const fetchPosts = async (targetUserName: string) => {
+  const { data: postsData } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("user_name", targetUserName)
+    .order("created_at", { ascending: false })
 
-  const fetchPosts = async (name: string) => {
-    const { data: postsData } = await supabase
-      .from("posts").select("*").eq("user_name", name)
-      .order("created_at", { ascending: false })
+  if (!postsData) return
 
-    const { data: likesData } = await supabase.from("likes").select("*")
+  const postIds = postsData.map((p) => p.id)
 
-    if (postsData) {
-      const merged = postsData.map((post) => ({
-        ...post,
-        likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
-        liked: likesData?.some((l) => l.post_id === post.id && l.user_name === name),
-      }))
-      setPosts(merged)
+  const { data: likesData } = await supabase
+    .from("likes")
+    .select("*")
+    .in("post_id", postIds)
+
+  const merged = postsData.map((post) => {
+    const postLikes = likesData?.filter((l) => l.post_id === post.id) || []
+    return {
+      ...post,
+      likes: postLikes.length,
+      liked: postLikes.some((l) => l.user_name === currentUser?.user_name),
     }
-  }
+  })
+
+  setPosts(merged)
+}
 
   const navItems = [
     {
@@ -276,9 +286,9 @@ export default function ProfilePage() {
   const handleLike = async (post: Post) => {
     if (post.liked) {
       await supabase.from("likes").delete()
-        .eq("post_id", post.id).eq("user_name", currentUser?.user_name)
+        .eq("post_id", post.id).eq("user_name", userName)
     } else {
-      await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser?.user_name})
+      await supabase.from("likes").insert({ post_id: post.id, user_name: userName })
     }
     fetchPosts(userName)
   }
