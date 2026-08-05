@@ -573,6 +573,13 @@ export default function ProfilePage() {
         {/* プロフィールカード */}
         <div style={{ padding: "20px", borderBottom: "1px solid #333" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+            <AvatarUpload
+              isOwnProfile="{isOwnProfile}"
+              userId={user?.id || ""}
+              currentAvatar={avatarUrl}
+              userName={userName}
+              onUploadComplete={(url) => setAvatarUrl(url)}
+            />
             {isOwnProfile ? (
               !editing ? (
                 <button
@@ -586,13 +593,6 @@ export default function ProfilePage() {
                 </button>
               ) : (
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <AvatarUpload
-                    isOwnProfile="{isOwnProfile}"
-                    userId={user?.id || ""}
-                    currentAvatar={avatarUrl}
-                    userName={userName}
-                    onUploadComplete={(url) => setAvatarUrl(url)}
-                  />
                   <button
                     onClick={() => {
                       setEditing(false)
