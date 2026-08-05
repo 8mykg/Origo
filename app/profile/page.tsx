@@ -39,6 +39,7 @@ type Post = {
 export default function ProfilePage() {
   const isMobile = useIsMobile()
   const [activeTab, setActiveTab] = useState("profile")
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [editing, setEditing] = useState(false)
@@ -57,7 +58,6 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
   const [replyInput, setReplyInput] = useState("")
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -274,19 +274,19 @@ export default function ProfilePage() {
   }
 
   const handleLike = async (post: Post) => {
-    if (!currentUser) return
     if (post.liked) {
-      await supabase.from("likes").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
+      await supabase.from("likes").delete()
+        .eq("post_id", post.id).eq("user_name", userName)
     } else {
-      await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
+      await supabase.from("likes").insert({ post_id: post.id, user_name: userName })
     }
     fetchPosts(userName)
   }
 
   const handleReply = async () => {
-    if (!replyInput.trim() || !currentUser || !replyingTo) return
+    if (!replyInput.trim() || !userName || !replyingTo) return
     await supabase.from("posts").insert({
-      user_name: currentUser.user_name,
+      user_name: userName,
       content: replyInput,
       reply_to: replyingTo.id,
     })
@@ -375,7 +375,7 @@ export default function ProfilePage() {
             </div>
 
             <div style={{ borderLeft: "2px solid #333", marginLeft: "18px", paddingLeft: "16px", marginBottom: "16px" }}>
-              <span style={{ color: "#888", fontSize: "13px" }}>返信先: @{replyingTo.user_name}</span>
+              <span style={{ color: "#888", fontSize: "13px" }}>返信元:返信先|@{userName}:{replyingTo.user_name}</span>
             </div>
 
             {/* リプライ入力 */}
@@ -438,7 +438,7 @@ export default function ProfilePage() {
         borderRight: "1px solid #333", flexShrink: 0
       }}>
         <div style={{ padding: "0px 0px", marginBottom: "12px" }}>
-          <img src="/logo-full.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
+          <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
         </div>
 
         <nav style={{ flex: 1 }}>
@@ -797,7 +797,7 @@ export default function ProfilePage() {
             編集ボタンから表示名・自己紹介・ユーザー名を変更できます
           </p>
         </div>
-        <p style={{ color: "#888", fontSize: "8px", margin: "0px" }}>
+        <p style={{ color: "#888", fontSize: "12px", margin: "0px" }}>
           Copyright © 2026
           <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
             tumayouzi_Dev.
