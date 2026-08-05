@@ -117,33 +117,36 @@ export default function ProfilePage() {
     init()
   }, [])
 
-const fetchPosts = async (targetUserName: string) => {
-  const { data: postsData } = await supabase
-    .from("posts")
-    .select("*")
-    .eq("user_name", targetUserName)
-    .order("created_at", { ascending: false })
+  const fetchPosts = async (targetUserName: string) => {
+    const { data: postsData } = await supabase
+      .from("posts")
+      .select(`
+    *,users!inner (avatar_url,display_name
+      )
+    `)
+      .eq("user_name", targetUserName)
+      .order("created_at", { ascending: false })
 
-  if (!postsData) return
+    if (!postsData) return
 
-  const postIds = postsData.map((p) => p.id)
+    const postIds = postsData.map((p) => p.id)
 
-  const { data: likesData } = await supabase
-    .from("likes")
-    .select("*")
-    .in("post_id", postIds)
+    const { data: likesData } = await supabase
+      .from("likes")
+      .select("*")
+      .in("post_id", postIds)
 
-  const merged = postsData.map((post) => {
-    const postLikes = likesData?.filter((l) => l.post_id === post.id) || []
-    return {
-      ...post,
-      likes: postLikes.length,
-      liked: postLikes.some((l) => l.user_name === currentUser?.user_name),
-    }
-  })
+    const merged = postsData.map((post) => {
+      const postLikes = likesData?.filter((l) => l.post_id === post.id) || []
+      return {
+        ...post,
+        likes: postLikes.length,
+        liked: postLikes.some((l) => l.user_name === currentUser?.user_name),
+      }
+    })
 
-  setPosts(merged)
-}
+    setPosts(merged)
+  }
 
   const navItems = [
     {
@@ -376,7 +379,7 @@ const fetchPosts = async (targetUserName: string) => {
           }}>
             {/* 元の投稿 */}
             <div style={{ display: "flex", gap: "12px", marginBottom: "16px", opacity: 0.7 }}>
-              <Avatar url={avatarUrl} name={replyingTo.user_name} size={36} />
+              <Avatar url={replyingTo.avatar_url} name={replyingTo.user_name} size={36} />
               <div>
                 <span style={{ fontWeight: "bold", fontSize: "14px" }}>{replyingTo.display_name}</span>
                 <span style={{ color: "#888", fontSize: "13px", marginLeft: "8px" }}>@{replyingTo.user_name}</span>
