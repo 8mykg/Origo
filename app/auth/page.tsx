@@ -150,9 +150,9 @@ export default function AuthPage() {
           width: "400px", textAlign: "center"
         }}>
           <p style={{ fontSize: "40px", margin: "0 0 16px" }}>📧</p>
-          <h2 style={{ color: "#fff", marginBottom: "8px" }}>メールを確認して！</h2>
+          <h2 style={{ color: "#fff", marginBottom: "8px" }}>メールを確認</h2>
           <p style={{ color: "#888" }}>
-            {email} に確認メールを送ったよ！リンクをクリックして登録完了！
+            {email} に確認メールを送りました、リンクをクリックして登録完了してください
           </p>
           <button
             onClick={() => { setConfirmSent(false); setIsLogin(true) }}
@@ -249,7 +249,7 @@ export default function AuthPage() {
                     cursor: "pointer", textAlign: "center",
                     boxSizing: "border-box" as const
                   }}>
-                    📷 アイコンを選ぶ（任意・10MB以下）
+                    アイコンを選ぶ（任意・10MB以下）
                     <input
                       type="file"
                       accept="image/*"

@@ -219,8 +219,8 @@ export default function ProfilePage() {
 
     // ユーザー名が変わった場合は重複チェック
     if (newUserName !== userName) {
-      if (newUserName.length < 3) {
-        setError("ユーザー名は3文字以上にしてください")
+      if (newUserName.length < 1) {
+        setError("ユーザー名を入力してください")
         setSaving(false)
         return
       }
@@ -305,17 +305,7 @@ export default function ProfilePage() {
   }
 
   const handleDelete = async (postId: string) => {
-
     await supabase.from("likes").delete().eq("post_id", postId)
-
-    const { error } = await supabase.from("posts").delete().eq("id", postId)
-
-    if (error) {
-      console.error("削除失敗:", error.message)
-      alert("削除できませんでした: " + error.message)
-      return
-    }
-
     fetchPosts(userName)
   }
 
@@ -583,12 +573,6 @@ export default function ProfilePage() {
         {/* プロフィールカード */}
         <div style={{ padding: "20px", borderBottom: "1px solid #333" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-            <AvatarUpload
-              userId={user?.id || ""}
-              currentAvatar={avatarUrl}
-              userName={userName}
-              onUploadComplete={(url) => setAvatarUrl(url)}
-            />
             {isOwnProfile ? (
               !editing ? (
                 <button
@@ -602,6 +586,12 @@ export default function ProfilePage() {
                 </button>
               ) : (
                 <div style={{ display: "flex", gap: "8px" }}>
+                  <AvatarUpload
+                    userId={user?.id || ""}
+                    currentAvatar={avatarUrl}
+                    userName={userName}
+                    onUploadComplete={(url) => setAvatarUrl(url)}
+                  />
                   <button
                     onClick={() => {
                       setEditing(false)
