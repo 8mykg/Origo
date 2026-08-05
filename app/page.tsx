@@ -315,7 +315,7 @@ export default function Home() {
       }}>
         {/* ロゴ */}
         <div style={{ padding: "0px 0px", marginBottom: "12px" }}>
-          <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
+          <img src="/logo-full.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
         </div>
         {/* ナビ */}
         <nav style={{ flex: 1 }}>
@@ -579,6 +579,13 @@ export default function Home() {
           <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
           <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>フォロー機能は開発中！</p>
         </div>
+              <p style={{ color: "#888", fontSize: "8px", margin: "0px" }}>
+        Copyright © 2026 
+        <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
+          tumayouzi_Dev.
+        </a>
+         All rights reserved.
+      </p>
       </div>}
       {/* 下部ナビ（スマホのみ） */}
       {isMobile && (

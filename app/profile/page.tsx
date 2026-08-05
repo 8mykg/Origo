@@ -57,8 +57,8 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
   const [replyInput, setReplyInput] = useState("")
-  const [input, setInput] = useState("")
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -274,11 +274,11 @@ export default function ProfilePage() {
   }
 
   const handleLike = async (post: Post) => {
+    if (!currentUser) return
     if (post.liked) {
-      await supabase.from("likes").delete()
-        .eq("post_id", post.id).eq("user_name", userName)
+      await supabase.from("likes").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
     } else {
-      await supabase.from("likes").insert({ post_id: post.id, user_name: userName })
+      await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
     }
     fetchPosts(userName)
   }
@@ -438,7 +438,7 @@ export default function ProfilePage() {
         borderRight: "1px solid #333", flexShrink: 0
       }}>
         <div style={{ padding: "0px 0px", marginBottom: "12px" }}>
-          <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
+          <img src="/logo-full.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
         </div>
 
         <nav style={{ flex: 1 }}>
@@ -635,6 +635,19 @@ export default function ProfilePage() {
           {editing ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div>
+                <label style={{ color: "#888", fontSize: "13px", marginBottom: "4px", display: "block" }}>表示名</label>
+                <input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  style={{
+                    width: "100%", background: "#111",
+                    border: "1px solid #444", borderRadius: "8px",
+                    padding: "10px", color: "#fff", fontSize: "15px",
+                    outline: "none", boxSizing: "border-box" as const
+                  }}
+                />
+              </div>
+              <div>
                 <label style={{ color: "#888", fontSize: "13px", marginBottom: "4px", display: "block" }}>
                   ユーザー名（英数字・アンダースコアのみ）
                 </label>
@@ -652,19 +665,6 @@ export default function ProfilePage() {
                     }}
                   />
                 </div>
-              </div>
-              <div>
-                <label style={{ color: "#888", fontSize: "13px", marginBottom: "4px", display: "block" }}>表示名</label>
-                <input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  style={{
-                    width: "100%", background: "#111",
-                    border: "1px solid #444", borderRadius: "8px",
-                    padding: "10px", color: "#fff", fontSize: "15px",
-                    outline: "none", boxSizing: "border-box" as const
-                  }}
-                />
               </div>
               <div>
                 <label style={{ color: "#888", fontSize: "13px", marginBottom: "4px", display: "block" }}>自己紹介</label>
@@ -729,55 +729,57 @@ export default function ProfilePage() {
                 <span style={{ color: "#888", fontSize: "13px" }}>@{userName}</span>
                 <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
               </div>
-              <p style={{ margin: "0 0 8px", fontSize: "15px", lineHeight: "1.5" }}>{post.content}</p>
-              <button
-                onClick={() => handleLike(post)}
-                style={{
-                  background: "none", border: "none",
-                  cursor: "pointer",
-                  color: post.liked ? "#f91880" : "#888",
-                  fontSize: "14px", display: "flex",
-                  alignItems: "center", gap: "6px",
-                  padding: "4px 8px", borderRadius: "20px"
-                }}>
-                {post.liked ? "❤️" : "🤍"} {post.likes}
-              </button>
-              {/* リプライボタン */}
-              <button
-                onClick={() => setReplyingTo(post)}
-                style={{
-                  background: "none", border: "none",
-                  cursor: "pointer", color: "#888",
-                  fontSize: "14px", display: "flex",
-                  alignItems: "center", gap: "6px",
-                  padding: "4px 8px", borderRadius: "20px"
-                }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                {post.reply_count || 0}
-              </button>
-              {/* 自分の投稿だけ削除ボタン表示 */}
-              {post.user_name === currentUser?.user_name && (
+              <p style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5" }}>{post.content}</p>
+              <div style={{ display: "flex", gap: "16px" }}>
                 <button
-                  onClick={() => handleDelete(post.id)}
+                  onClick={() => handleLike(post)}
                   style={{
-                    marginLeft: "auto", background: "none",
-                    border: "none", cursor: "pointer",
-                    color: "#555", padding: "2px 6px",
-                    borderRadius: "4px", fontSize: "13px"
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
-                  onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    <path d="M10 11v6M14 11v6" />
-                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                  </svg>
+                    background: "none", border: "none",
+                    cursor: "pointer",
+                    color: post.liked ? "#f91880" : "#888",
+                    fontSize: "14px", display: "flex",
+                    alignItems: "center", gap: "6px",
+                    padding: "4px 8px", borderRadius: "20px"
+                  }}>
+                  {post.liked ? "❤️" : "🤍"} {post.likes}
                 </button>
-              )}
+                {/* リプライボタン */}
+                <button
+                  onClick={() => setReplyingTo(post)}
+                  style={{
+                    background: "none", border: "none",
+                    cursor: "pointer", color: "#888",
+                    fontSize: "14px", display: "flex",
+                    alignItems: "center", gap: "6px",
+                    padding: "4px 8px", borderRadius: "20px"
+                  }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {post.reply_count || 0}
+                </button>
+                {/* 自分の投稿だけ削除ボタン表示 */}
+                {post.user_name === currentUser?.user_name && (
+                  <button
+                    onClick={() => handleDelete(post.id)}
+                    style={{
+                      marginLeft: "auto", background: "none",
+                      border: "none", cursor: "pointer",
+                      color: "#555", padding: "2px 6px",
+                      borderRadius: "4px", fontSize: "13px"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
+                    onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6M14 11v6" />
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -796,6 +798,13 @@ export default function ProfilePage() {
           </p>
         </div>
       </div>}
+      <p style={{ color: "#888", fontSize: "8px", margin: "0px" }}>
+        Copyright © 2026 
+        <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
+          tumayouzi_Dev.
+        </a>
+         All rights reserved.
+      </p>
       {/* 下部ナビ（スマホのみ） */}
       {isMobile && (
         <div style={{
