@@ -587,6 +587,7 @@ export default function ProfilePage() {
               ) : (
                 <div style={{ display: "flex", gap: "8px" }}>
                   <AvatarUpload
+                    isOwnProfile="{isOwnProfile}"
                     userId={user?.id || ""}
                     currentAvatar={avatarUrl}
                     userName={userName}
