@@ -3,6 +3,16 @@ export const dynamic = "force-dynamic"
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
 import AvatarUpload from "../components/AvatarUpload"
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener("resize", check)
+    return () => window.removeEventListener("resize", check)
+  }, [])
+  return isMobile
+}
 
 type User = {
   id: string
@@ -27,6 +37,8 @@ type Post = {
 }
 
 export default function ProfilePage() {
+  const isMobile = useIsMobile()
+  const [activeTab, setActiveTab] = useState("profile")
   const [user, setUser] = useState<User | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [editing, setEditing] = useState(false)
@@ -43,6 +55,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [replyingTo, setReplyingTo] = useState<Post | null>(null)
+  const [replyInput, setReplyInput] = useState("")
+  const [input, setInput] = useState("")
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -101,6 +117,7 @@ export default function ProfilePage() {
     init()
   }, [])
 
+
   const fetchPosts = async (name: string) => {
     const { data: postsData } = await supabase
       .from("posts").select("*").eq("user_name", name)
@@ -117,6 +134,48 @@ export default function ProfilePage() {
       setPosts(merged)
     }
   }
+
+  const navItems = [
+    {
+      id: "home", icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      ), label: "ホーム", action: () => window.location.href = "/"
+    },
+    {
+      id: "notifications", icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      ), label: "通知", action: () => { }, soon: true
+    },
+    {
+      id: "bookmarks", icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+        </svg>
+      ), label: "ブックマーク", action: () => { }, soon: true
+    },
+    {
+      id: "profile", icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      ), label: "プロフィール", action: () => window.location.href = "/profile"
+    },
+    {
+      id: "settings", icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      ), label: "設定", action: () => { }, soon: true
+    },
+  ]
 
   const fetchFollowCounts = async (name: string) => {
     const { data: followers } = await supabase
@@ -224,10 +283,54 @@ export default function ProfilePage() {
     fetchPosts(userName)
   }
 
+  const handleReply = async () => {
+    if (!replyInput.trim() || !currentUser || !replyingTo) return
+    await supabase.from("posts").insert({
+      user_name: currentUser.user_name,
+      content: replyInput,
+      reply_to: replyingTo.id,
+    })
+
+    // リプライ数を更新
+    await supabase.from("posts")
+      .update({ reply_count: (replyingTo.reply_count || 0) + 1 })
+      .eq("id", replyingTo.id)
+
+    setReplyInput("")
+    setReplyingTo(null)
+    fetchPosts(userName)
+  }
+
+  const handleDelete = async (postId: string) => {
+    if (!confirm("この投稿を削除しますか？")) return
+    await supabase.from("posts").delete().eq("id", postId)
+    fetchPosts(userName)
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = "/auth"
+  }
+
   const formatDate = (str: string) => {
     const d = new Date(str)
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
   }
+
+  const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, size?: number }) => (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: url ? "transparent" : "#1d9bf0",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontWeight: "bold", fontSize: size * 0.4, color: "#fff",
+      overflow: "hidden", flexShrink: 0
+    }}>
+      {url
+        ? <img src={url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        : name[0]?.toUpperCase()
+      }
+    </div>
+  )
 
   if (loading) {
     return (
@@ -248,8 +351,87 @@ export default function ProfilePage() {
       display: "flex", justifyContent: "space-between"
     }}>
 
+      {/* リプライモーダル */}
+      {replyingTo && (
+        <div style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.7)",
+          zIndex: 1000, display: "flex",
+          alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            background: "#111", border: "1px solid #333",
+            borderRadius: "16px", padding: "24px",
+            width: "500px", maxWidth: "90vw"
+          }}>
+            {/* 元の投稿 */}
+            <div style={{ display: "flex", gap: "12px", marginBottom: "16px", opacity: 0.7 }}>
+              <Avatar url={replyingTo.avatar_url} name={replyingTo.user_name} size={36} />
+              <div>
+                <span style={{ fontWeight: "bold", fontSize: "14px" }}>{replyingTo.display_name}</span>
+                <span style={{ color: "#888", fontSize: "13px", marginLeft: "8px" }}>@{replyingTo.user_name}</span>
+                <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#ccc" }}>{replyingTo.content}</p>
+              </div>
+            </div>
+
+            <div style={{ borderLeft: "2px solid #333", marginLeft: "18px", paddingLeft: "16px", marginBottom: "16px" }}>
+              <span style={{ color: "#888", fontSize: "13px" }}>返信先: @{replyingTo.user_name}</span>
+            </div>
+
+            {/* リプライ入力 */}
+            <div style={{ display: "flex", gap: "12px" }}>
+              <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} size={36} />
+              <textarea
+                placeholder={`@${replyingTo.user_name}に返信`}
+                value={replyInput}
+                onChange={(e) => setReplyInput(e.target.value)}
+                autoFocus
+                style={{
+                  flex: 1, background: "transparent",
+                  border: "none", outline: "none",
+                  fontSize: "16px", resize: "none",
+                  color: "#fff", minHeight: "80px"
+                }}
+                rows={3}
+              />
+            </div>
+
+            <div style={{
+              display: "flex", justifyContent: "space-between",
+              alignItems: "center", marginTop: "16px",
+              borderTop: "1px solid #333", paddingTop: "12px"
+            }}>
+              <button
+                onClick={() => { setReplyingTo(null); setReplyInput("") }}
+                style={{
+                  background: "none", border: "none",
+                  color: "#888", cursor: "pointer", fontSize: "14px"
+                }}>
+                キャンセル
+              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ color: replyInput.length > 300 ? "#f00" : "#888", fontSize: "14px" }}>
+                  {300 - replyInput.length}
+                </span>
+                <button
+                  onClick={handleReply}
+                  disabled={!replyInput.trim() || replyInput.length > 300}
+                  style={{
+                    background: !replyInput.trim() || replyInput.length > 300 ? "#555" : "#1d9bf0",
+                    color: "white", border: "none", borderRadius: "24px",
+                    padding: "8px 20px", fontWeight: "bold",
+                    cursor: !replyInput.trim() || replyInput.length > 300 ? "not-allowed" : "pointer"
+                  }}>
+                  返信する
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 左サイドバー */}
-      <div style={{
+      {!isMobile && <div style={{
         width: "280px", padding: "20px 12px",
         position: "sticky", top: 0, height: "100vh",
         display: "flex", flexDirection: "column",
@@ -339,30 +521,33 @@ export default function ProfilePage() {
         </nav>
 
         {/* ユーザー情報 */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: "12px",
-          borderRadius: "12px", padding: "12px"
-        }}>
-          {avatarUrl ? (
-            <img src={avatarUrl} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} />
-          ) : (
-            <div style={{
-              width: "40px", height: "40px", borderRadius: "50%",
-              background: "#1d9bf0", display: "flex", alignItems: "center",
-              justifyContent: "center", fontWeight: "bold", fontSize: "16px"
-            }}>{userName[0]?.toUpperCase()}</div>
-          )}
+        <div
+          style={{
+            display: "flex", alignItems: "center", gap: "12px",
+            background: "none", border: "none", color: "#fff",
+            borderRadius: "12px", padding: "12px",
+            width: "100%", textAlign: "left"
+          }}>
+          <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} size={40} />
           <div style={{ flex: 1, overflow: "hidden" }}>
             <p style={{ margin: 0, fontSize: "14px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {user?.display_name}
+              {currentUser?.display_name}
             </p>
-            <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>@{userName}</p>
+            <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>@{currentUser?.user_name}</p>
           </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "none", border: "none", color: "#888",
+              cursor: "pointer", padding: "4px"
+            }}>
+            ↩
+          </button>
         </div>
-      </div>
+      </div>}
 
       {/* メインコンテンツ */}
-      <div style={{ flex: 1, borderRight: "1px solid #333", borderLeft: "1px solid #333" }}>
+      <div style={{ flex: 1, borderRight: isMobile ? "none" : "1px solid #333", borderLeft: isMobile ? "none" : "1px solid #333", paddingBottom: isMobile ? "80px" : "0" }}>
         {/* ヘッダー */}
         <div style={{
           position: "sticky", top: 0,
@@ -557,13 +742,49 @@ export default function ProfilePage() {
                 }}>
                 {post.liked ? "❤️" : "🤍"} {post.likes}
               </button>
+              {/* リプライボタン */}
+              <button
+                onClick={() => setReplyingTo(post)}
+                style={{
+                  background: "none", border: "none",
+                  cursor: "pointer", color: "#888",
+                  fontSize: "14px", display: "flex",
+                  alignItems: "center", gap: "6px",
+                  padding: "4px 8px", borderRadius: "20px"
+                }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                {post.reply_count || 0}
+              </button>
+              {/* 自分の投稿だけ削除ボタン表示 */}
+              {post.user_name === currentUser?.user_name && (
+                <button
+                  onClick={() => handleDelete(post.id)}
+                  style={{
+                    marginLeft: "auto", background: "none",
+                    border: "none", cursor: "pointer",
+                    color: "#555", padding: "2px 6px",
+                    borderRadius: "4px", fontSize: "13px"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
         ))}
       </div>
 
       {/* 右サイドバー */}
-      <div style={{
+      {!isMobile && <div style={{
         width: "320px", padding: "20px 16px",
         position: "sticky", top: 0, height: "100vh",
         overflowY: "auto", flexShrink: 0
@@ -574,8 +795,33 @@ export default function ProfilePage() {
             編集ボタンから表示名・自己紹介・ユーザー名を変更できます
           </p>
         </div>
-      </div>
-
+      </div>}
+      {/* 下部ナビ（スマホのみ） */}
+      {isMobile && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          background: "rgba(0,0,0,0.9)",
+          backdropFilter: "blur(12px)",
+          borderTop: "1px solid #333",
+          display: "flex", justifyContent: "space-around",
+          padding: "12px 0", zIndex: 100
+        }}>
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={item.action}
+              style={{
+                background: "none", border: "none",
+                color: activeTab === item.id ? "#fff" : "#888",
+                cursor: "pointer", padding: "8px",
+                display: "flex", flexDirection: "column",
+                alignItems: "center"
+              }}>
+              {item.icon}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
