@@ -117,35 +117,25 @@ export default function ProfilePage() {
     init()
   }, [])
 
-  const fetchPosts = async (targetUserName: string) => {
+  const fetchPosts = async (name: string) => {
     const { data: postsData } = await supabase
       .from("posts")
-      .select(`
-    *,users!inner (avatar_url,display_name
-      )
-    `)
-      .eq("user_name", targetUserName)
+      .select("*")
+      .eq("user_name", name)
       .order("created_at", { ascending: false })
 
-    if (!postsData) return
+    const { data: likesData } = await supabase.from("likes").select("*")
 
-    const postIds = postsData.map((p) => p.id)
-
-    const { data: likesData } = await supabase
-      .from("likes")
-      .select("*")
-      .in("post_id", postIds)
-
-    const merged = postsData.map((post) => {
-      const postLikes = likesData?.filter((l) => l.post_id === post.id) || []
-      return {
+    if (postsData) {
+      const merged = postsData.map((post) => ({
         ...post,
-        likes: postLikes.length,
-        liked: postLikes.some((l) => l.user_name === currentUser?.user_name),
-      }
-    })
-
-    setPosts(merged)
+        avatar_url: avatarUrl || user?.avatar_url,
+        display_name: user?.display_name || userName,
+        likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
+        liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
+      }))
+      setPosts(merged)
+    }
   }
 
   const navItems = [
