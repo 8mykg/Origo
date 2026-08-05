@@ -574,7 +574,7 @@ export default function ProfilePage() {
         <div style={{ padding: "20px", borderBottom: "1px solid #333" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
             <AvatarUpload
-              isOwnProfile="{isOwnProfile}"
+              isOwnProfile={isOwnProfile}
               userId={user?.id || ""}
               currentAvatar={avatarUrl}
               userName={userName}

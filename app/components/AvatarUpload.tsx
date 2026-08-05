@@ -5,14 +5,14 @@ import { getCroppedImg } from "../lib/cropImage"
 import { supabase } from "../lib/supabase"
 
 type Props = {
-  isOwnProfile: string
+  isOwnProfile: boolean
   userId: string
   currentAvatar: string | null
   userName: string
   onUploadComplete: (url: string) => void
 }
 
-export default function AvatarUpload({ isOwnProfile, userId, currentAvatar, userName, onUploadComplete }: Props) {
+export default function AvatarUpload({isOwnProfile, userId, currentAvatar, userName, onUploadComplete }: Props) {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
