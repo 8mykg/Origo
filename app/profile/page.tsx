@@ -797,14 +797,14 @@ export default function ProfilePage() {
             編集ボタンから表示名・自己紹介・ユーザー名を変更できます
           </p>
         </div>
-      </div>}
-      <p style={{ color: "#888", fontSize: "8px", margin: "0px" }}>
-        Copyright © 2026 
-        <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
-          tumayouzi_Dev.
-        </a>
-         All rights reserved.
-      </p>
+        </div>}
+        <p style={{ color: "#888", fontSize: "8px", margin: "0px" }}>
+          Copyright © 2026 
+          <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
+            tumayouzi_Dev.
+          </a>
+          All rights reserved.
+        </p>
       {/* 下部ナビ（スマホのみ） */}
       {isMobile && (
         <div style={{
