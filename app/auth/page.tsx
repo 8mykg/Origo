@@ -180,7 +180,7 @@ export default function AuthPage() {
         background: "#111", border: "1px solid #333",
         borderRadius: "16px", padding: "40px", width: "400px"
       }}>
-        <h1 style={{ color: "#fff", fontSize: "28px", marginBottom: "8px" }}>Origo </h1>
+        <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
         <p style={{ color: "#888", marginBottom: "24px" }}>
           {isLogin ? "おかえり！" : "はじめまして！"}
         </p>
@@ -208,7 +208,7 @@ export default function AuthPage() {
           {!isLogin && (
             <>
               <input
-                placeholder="ユーザー名 (@なし)"
+                placeholder="ユーザー名(@なし)"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
                 style={inputStyle}
@@ -216,7 +216,7 @@ export default function AuthPage() {
 
               {/* 表示名 */}
               <input
-                placeholder="表示名（省略するとユーザー名に置換）"
+                placeholder="表示名(任意)"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 style={inputStyle}
@@ -249,7 +249,7 @@ export default function AuthPage() {
                     cursor: "pointer", textAlign: "center",
                     boxSizing: "border-box" as const
                   }}>
-                    アイコンを選ぶ（任意・10MB以下）
+                    アイコンを選ぶ（10MB以下）
                     <input
                       type="file"
                       accept="image/*"

@@ -486,7 +486,11 @@ export default function Home() {
                     <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
                     <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
                   </div>
-                  <p style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5" }}>{post.content}</p>
+                  <p
+                    onClick={() => window.location.href = `/post/${post.id}`}
+                    style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5", cursor: "pointer" }}>
+                    {post.content}
+                  </p>
                   <div style={{ display: "flex", gap: "16px" }}>
                     {/* いいねボタン */}
                     <button
