@@ -153,6 +153,7 @@ export default function AuthPage() {
           <h2 style={{ color: "#fff", marginBottom: "8px" }}>メールを確認</h2>
           <p style={{ color: "#888" }}>
             {email} に確認メールを送りました、リンクをクリックして登録完了してください
+            ※メアドに送ったリンクを開かなくてもログインできます
           </p>
           <button
             onClick={() => { setConfirmSent(false); setIsLogin(true) }}
@@ -180,7 +181,7 @@ export default function AuthPage() {
         background: "#111", border: "1px solid #333",
         borderRadius: "16px", padding: "40px", width: "400px"
       }}>
-        <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
+        <img src="/logo-full.svg" alt="Origo" style={{ height: "150px", width: "auto" }} />
         <p style={{ color: "#888", marginBottom: "24px" }}>
           {isLogin ? "おかえり！" : "はじめまして！"}
         </p>
@@ -365,7 +366,7 @@ export default function AuthPage() {
             }}>
             <img
               src="https://www.google.com/favicon.ico"
-              width="18" height="18"
+              width="30" height="30"
               alt="Google"
             />
             Googleで{isLogin ? "ログイン" : "登録"}

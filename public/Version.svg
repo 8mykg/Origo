@@ -1,0 +1,14 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="200" height="200">
+	<style>
+		.s0 { fill: #ffffff;stroke: #ffffff;stroke-miterlimit:10 } 
+	</style>
+	<g id="Layer 1">
+		<path id="シェイプ 3" fill-rule="evenodd" class="s0" d="m300 70v15h-300v-15z"/>
+		<path id="シェイプ 3 copy" fill-rule="evenodd" class="s0" d="m300 142v15h-300v-15z"/>
+		<path id="シェイプ 3 copy 2" fill-rule="evenodd" class="s0" d="m300 216v15h-300v-15z"/>
+		<path id="シェイプ 4" fill-rule="evenodd" class="s0" d="m282 76v74h-25v-74z"/>
+		<path id="シェイプ 4 copy" fill-rule="evenodd" class="s0" d="m177 153v74h-15v-74z"/>
+		<path id="シェイプ 4 copy 2" fill-rule="evenodd" class="s0" d="m30.97 76.72l34.65 142.6-14.75 3.58-34.65-142.59z"/>
+		<path id="シェイプ 4 copy 3" fill-rule="evenodd" class="s0" d="m129.38 74.57l-49.61 150.05-14.24-4.71 49.61-150.05z"/>
+	</g>
+</svg>

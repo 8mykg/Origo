@@ -1,0 +1,509 @@
+"use client"
+
+import { useState, useEffect, use } from "react"
+import { supabase } from "../../lib/supabase"
+import Layout from "../../components/Layout"
+// ----------------------------------------------------
+// 型定義（君の定義をそのまま適用！）
+// ----------------------------------------------------
+type Post = {
+    id: string
+    user_name: string
+    display_name: string
+    content: string
+    created_at: string
+    likes?: number
+    liked?: boolean
+    avatar_url?: string
+    reply_to?: string | null
+    reply_count?: number
+}
+
+type User = {
+    id: string
+    user_name: string
+    display_name: string
+    avatar_url?: string
+    bio: string
+    created_at: string
+}
+
+type follows = {
+    follower_name: string
+    following_name: string
+    created_at: string
+}
+
+// ----------------------------------------------------
+// アバターコンポーネント (簡易版)
+// ----------------------------------------------------
+const AvatarUpload = ({
+    currentAvatar,
+    userName,
+}: {
+    isOwnProfile: boolean
+    userId: string
+    currentAvatar?: string
+    userName: string
+    onUploadComplete: (url: string) => void
+}) => {
+    return (
+        <div style={{
+            width: "72px", height: "72px", borderRadius: "50%",
+            background: currentAvatar ? "transparent" : "#1d9bf0",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: "bold", fontSize: "28px", color: "#fff",
+            overflow: "hidden", position: "relative"
+        }}>
+            {currentAvatar ? (
+                <img src={currentAvatar} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+                userName[0]?.toUpperCase()
+            )}
+        </div>
+    )
+}
+
+// ----------------------------------------------------
+// メインコンポーネント
+// ----------------------------------------------------
+export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+    const { username: userNameParam } = use(params)
+
+    const [currentUser, setCurrentUser] = useState<User | null>(null) // ログイン中の自分
+    const [profileUser, setProfileUser] = useState<User | null>(null)  // 表示中のプロフの主
+    const [posts, setPosts] = useState<Post[]>([])
+    const [loading, setLoading] = useState(true)
+
+    // 編集用の State
+    const [editing, setEditing] = useState(false)
+    const [displayName, setDisplayName] = useState("")
+    const [newUserName, setNewUserName] = useState("")
+    const [bio, setBio] = useState("")
+    const [avatarUrl, setAvatarUrl] = useState("")
+    const [saving, setSaving] = useState(false)
+    const [error, setError] = useState("")
+
+    // フォロー用の State
+    const [isFollowing, setIsFollowing] = useState(false)
+    const [followersCount, setFollowersCount] = useState(0)
+    const [followingCount, setFollowingCount] = useState(0)
+
+    // リプライ用の State
+    const [, setReplyingTo] = useState<Post | null>(null)
+
+    const userName = userNameParam || ""
+    const isOwnProfile = currentUser?.user_name === userName
+
+    // 1. 初期データロード
+    useEffect(() => {
+        const init = async () => {
+            // ログインセッション確認
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) { window.location.href = "/auth"; return }
+
+            // 自分のデータ取得
+            const { data: myData } = await supabase
+                .from("users").select("*").eq("id", session.user.id).single<User>()
+            if (myData) setCurrentUser(myData)
+
+            // 表示対象ユーザーのデータ取得
+            const { data: targetData } = await supabase
+                .from("users").select("*").eq("user_name", userName).single<User>()
+
+            if (targetData) {
+                setProfileUser(targetData)
+                setDisplayName(targetData.display_name || "")
+                setNewUserName(targetData.user_name)
+                setBio(targetData.bio || "")
+                setAvatarUrl(targetData.avatar_url || "")
+
+                if (myData) {
+                    checkFollowStatus(myData.user_name, targetData.user_name)
+                }
+                fetchFollowCounts(targetData.user_name)
+                fetchPosts(targetData.user_name, myData?.user_name)
+            }
+
+            setLoading(false)
+        }
+        init()
+    }, [userName])
+
+    // 2. 投稿一覧取得
+    const fetchPosts = async (targetUserName: string, myUserName?: string) => {
+        const { data: postsData } = await supabase
+            .from("posts")
+            .select("*")
+            .eq("user_name", targetUserName)
+            .order("created_at", { ascending: false })
+
+        const { data: likesData } = await supabase.from("likes").select("*")
+
+        if (postsData) {
+            // ↓ (post: Post) と (l: { post_id: string; user_name: string }) で「型」を指定してあげる！
+            const merged: Post[] = postsData.map((post: Post) => ({
+                ...post,
+                display_name: profileUser?.display_name || post.user_name,
+                avatar_url: profileUser?.avatar_url || undefined,
+                likes: likesData?.filter((l: { post_id: string; user_name: string }) => l.post_id === post.id).length || 0,
+                liked: likesData?.some((l: { post_id: string; user_name: string }) => l.post_id === post.id && l.user_name === myUserName),
+            }))
+            setPosts(merged)
+        }
+    }
+
+    // 3. フォロー数の取得（follows 型を活用）
+    const fetchFollowCounts = async (targetUserName: string) => {
+        const { data: followers } = await supabase.from("follows").select("*").eq("following_name", targetUserName)
+        const { data: following } = await supabase.from("follows").select("*").eq("follower_name", targetUserName)
+
+        const followerList: follows[] = followers || []
+        const followingList: follows[] = following || []
+
+        setFollowersCount(followerList.length)
+        setFollowingCount(followingList.length)
+    }
+
+    // 4. フォロー状態のチェック
+    const checkFollowStatus = async (myUserName: string, targetUserName: string) => {
+        const { data } = await supabase
+            .from("follows")
+            .select("*")
+            .eq("follower_name", myUserName)
+            .eq("following_name", targetUserName)
+
+        setIsFollowing((data?.length || 0) > 0)
+    }
+
+    // 5. プロフィール保存
+    const handleSave = async () => {
+        if (!currentUser) return
+        setSaving(true)
+        setError("")
+
+        const { error: updateError } = await supabase
+            .from("users")
+            .update({
+                display_name: displayName,
+                user_name: newUserName,
+                bio: bio,
+                avatar_url: avatarUrl,
+            })
+            .eq("id", currentUser.id)
+
+        if (updateError) {
+            setError("保存に失敗しました: " + updateError.message)
+            setSaving(false)
+            return
+        }
+
+        setSaving(false)
+        setEditing(false)
+
+        if (newUserName !== userName) {
+            window.location.href = `/profile/${newUserName}`
+        } else {
+            window.location.reload()
+        }
+    }
+
+    // 6. フォロー / 解除処理
+    const handleFollow = async () => {
+        if (!currentUser || !profileUser) return
+        if (isFollowing) {
+            await supabase.from("follows").delete().eq("follower_name", currentUser.user_name).eq("following_name", profileUser.user_name)
+            setIsFollowing(false)
+            setFollowersCount((prev) => prev - 1)
+        } else {
+            await supabase.from("follows").insert({
+                follower_name: currentUser.user_name,
+                following_name: profileUser.user_name
+            })
+            setIsFollowing(true)
+            setFollowersCount((prev) => prev + 1)
+        }
+    }
+
+    // 7. いいね処理
+    const handleLike = async (post: Post) => {
+        if (!currentUser) return
+        if (post.liked) {
+            await supabase.from("likes").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
+        } else {
+            await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
+        }
+        fetchPosts(userName, currentUser.user_name)
+    }
+
+    // 8. 投稿削除
+    const handleDelete = async (postId: string) => {
+        await supabase.from("likes").delete().eq("post_id", postId)
+        const { error } = await supabase.from("posts").delete().eq("id", postId)
+        if (error) {
+            alert("削除できませんでした: " + error.message)
+            return
+        }
+        fetchPosts(userName, currentUser?.user_name)
+    }
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut()
+        window.location.href = "/auth"
+    }
+
+    const formatDate = (str: string) => {
+        if (!str) return ""
+        const d = new Date(str)
+        return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
+    }
+
+    if (loading) return <div style={{ background: "#000", minHeight: "100vh", color: "#fff", padding: "20px" }}>読み込み中...</div>
+
+    return (
+        <Layout>
+            <div style={{ paddingBottom: "80px" }}>
+                {/* ヘッダー */}
+                <div style={{
+                    position: "sticky", top: 0,
+                    background: "rgba(0,0,0,0.8)",
+                    backdropFilter: "blur(12px)",
+                    borderBottom: "1px solid #333",
+                    padding: "16px 20px", zIndex: 10,
+                    display: "flex", alignItems: "center", gap: "16px"
+                }}>
+                    <button
+                        onClick={() => window.location.href = "/"}
+                        style={{ background: "none", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer" }}>
+                        ←
+                    </button>
+                    <div>
+                        <h1 style={{ margin: 0, fontSize: "18px" }}>{profileUser?.display_name || userName}</h1>
+                        <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>{posts.length}件の投稿</p>
+                    </div>
+                </div>
+
+                {/* プロフィールカード */}
+                <div style={{ padding: "20px", borderBottom: "1px solid #333" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                        <AvatarUpload
+                            isOwnProfile={isOwnProfile}
+                            userId={profileUser?.id || ""}
+                            currentAvatar={avatarUrl}
+                            userName={userName}
+                            onUploadComplete={(url) => setAvatarUrl(url)}
+                        />
+                        {isOwnProfile ? (
+                            !editing ? (
+                                <button
+                                    onClick={() => setEditing(true)}
+                                    style={{
+                                        background: "none", border: "1px solid #555",
+                                        color: "#fff", borderRadius: "20px",
+                                        padding: "8px 16px", cursor: "pointer", fontWeight: "bold"
+                                    }}>
+                                    編集
+                                </button>
+                            ) : (
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <button
+                                        onClick={() => {
+                                            setEditing(false)
+                                            setNewUserName(userName)
+                                            setDisplayName(profileUser?.display_name || "")
+                                            setBio(profileUser?.bio || "")
+                                            setError("")
+                                        }}
+                                        style={{
+                                            background: "none", border: "1px solid #555",
+                                            color: "#888", borderRadius: "20px",
+                                            padding: "8px 16px", cursor: "pointer", fontWeight: "bold"
+                                        }}>
+                                        キャンセル
+                                    </button>
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        style={{
+                                            background: saving ? "#555" : "#1d9bf0",
+                                            border: "none", color: "#fff", borderRadius: "20px",
+                                            padding: "8px 16px", cursor: saving ? "not-allowed" : "pointer", fontWeight: "bold"
+                                        }}>
+                                        {saving ? "保存中..." : "保存"}
+                                    </button>
+                                </div>
+                            )
+                        ) : (
+                            <button
+                                onClick={handleFollow}
+                                style={{
+                                    background: isFollowing ? "none" : "#fff",
+                                    border: isFollowing ? "1px solid #555" : "none",
+                                    color: isFollowing ? "#fff" : "#000",
+                                    borderRadius: "20px", padding: "8px 20px",
+                                    cursor: "pointer", fontWeight: "bold", fontSize: "15px"
+                                }}>
+                                {isFollowing ? "フォロー中" : "フォローする"}
+                            </button>
+                        )}
+                    </div>
+
+                    {editing ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                            <div>
+                                <label style={{ color: "#888", fontSize: "13px", marginBottom: "4px", display: "block" }}>表示名</label>
+                                <input
+                                    value={displayName}
+                                    onChange={(e) => setDisplayName(e.target.value)}
+                                    style={{
+                                        width: "100%", background: "#111",
+                                        border: "1px solid #444", borderRadius: "8px",
+                                        padding: "10px", color: "#fff", fontSize: "15px",
+                                        outline: "none", boxSizing: "border-box"
+                                    }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ color: "#888", fontSize: "13px", marginBottom: "4px", display: "block" }}>
+                                    ユーザー名（英数字・アンダースコアのみ）
+                                </label>
+                                <div style={{ position: "relative" }}>
+                                    <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#888" }}>@</span>
+                                    <input
+                                        value={newUserName}
+                                        onChange={(e) => setNewUserName(e.target.value)}
+                                        style={{
+                                            width: "100%", background: "#111",
+                                            border: "1px solid #444", borderRadius: "8px",
+                                            padding: "10px 10px 10px 28px",
+                                            color: "#fff", fontSize: "15px",
+                                            outline: "none", boxSizing: "border-box"
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ color: "#888", fontSize: "13px", marginBottom: "4px", display: "block" }}>自己紹介</label>
+                                <textarea
+                                    value={bio}
+                                    onChange={(e) => setBio(e.target.value)}
+                                    rows={3}
+                                    style={{
+                                        width: "100%", background: "#111",
+                                        border: "1px solid #444", borderRadius: "8px",
+                                        padding: "10px", color: "#fff", fontSize: "15px",
+                                        outline: "none", resize: "none", boxSizing: "border-box"
+                                    }}
+                                />
+                            </div>
+                            {error && <p style={{ color: "#f44", fontSize: "14px", margin: 0 }}>{error}</p>}
+                        </div>
+                    ) : (
+                        <div>
+                            <p style={{ margin: "0 0 4px", fontWeight: "bold", fontSize: "18px" }}>
+                                {profileUser?.display_name || userName}
+                            </p>
+                            <p style={{ margin: "0 0 8px", color: "#888", fontSize: "14px" }}>@{userName}</p>
+                            {profileUser?.bio && <p style={{ margin: "0 0 12px", fontSize: "15px" }}>{profileUser.bio}</p>}
+
+                            {/* フォロー数 */}
+                            <div style={{ display: "flex", gap: "20px", marginBottom: "12px" }}>
+                                <span style={{ fontSize: "14px" }}>
+                                    <strong>{followingCount}</strong>
+                                    <span style={{ color: "#888", marginLeft: "4px" }}>フォロー中</span>
+                                </span>
+                                <span style={{ fontSize: "14px" }}>
+                                    <strong>{followersCount}</strong>
+                                    <span style={{ color: "#888", marginLeft: "4px" }}>フォロワー</span>
+                                </span>
+                            </div>
+
+                            <p style={{ margin: 0, color: "#888", fontSize: "13px" }}>
+                                登録日: {profileUser ? formatDate(profileUser.created_at) : ""}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* 投稿一覧 */}
+                {posts.map((post) => (
+                    <div key={post.id} style={{ borderBottom: "1px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
+                        <div style={{
+                            width: "44px", height: "44px", borderRadius: "50%",
+                            background: avatarUrl ? "transparent" : "#1d9bf0",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: "bold", fontSize: "18px", flexShrink: 0, overflow: "hidden"
+                        }}>
+                            {avatarUrl
+                                ? <img src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                : userName[0]?.toUpperCase()
+                            }
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
+                                <strong>{profileUser?.display_name || userName}</strong>
+                                <span style={{ color: "#888", fontSize: "13px" }}>@{userName}</span>
+                                <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
+                            </div>
+                            <p
+                                onClick={() => window.location.href = `/post/${post.id}`}
+                                style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5", cursor: "pointer" }}>
+                                {post.content}
+                            </p>
+                            <div style={{ display: "flex", gap: "16px" }}>
+                                <button
+                                    onClick={() => handleLike(post)}
+                                    style={{
+                                        background: "none", border: "none",
+                                        cursor: "pointer",
+                                        color: post.liked ? "#f91880" : "#888",
+                                        fontSize: "14px", display: "flex",
+                                        alignItems: "center", gap: "6px",
+                                        padding: "4px 8px", borderRadius: "20px"
+                                    }}>
+                                    {post.liked ? "❤️" : "🤍"} {post.likes}
+                                </button>
+                                {/* リプライボタン */}
+                                <button
+                                    onClick={() => setReplyingTo(post)}
+                                    style={{
+                                        background: "none", border: "none",
+                                        cursor: "pointer", color: "#888",
+                                        fontSize: "14px", display: "flex",
+                                        alignItems: "center", gap: "6px",
+                                        padding: "4px 8px", borderRadius: "20px"
+                                    }}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                    {post.reply_count || 0}
+                                </button>
+                                {/* 自分の投稿だけ削除ボタン表示 */}
+                                {post.user_name === currentUser?.user_name && (
+                                    <button
+                                        onClick={() => handleDelete(post.id)}
+                                        style={{
+                                            marginLeft: "auto", background: "none",
+                                            border: "none", cursor: "pointer",
+                                            color: "#555", padding: "2px 6px",
+                                            borderRadius: "4px", fontSize: "13px"
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
+                                        onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                            <path d="M10 11v6M14 11v6" />
+                                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </Layout>
+    )
+}
