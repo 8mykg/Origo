@@ -243,7 +243,13 @@ export default function Layout({ children }: LayoutProps) {
                 </svg>
             ),
             label: "プロフィール",
-            action: () => setActiveTab(`profile`),
+            action: () => {
+                if (currentUser?.user_name) {
+                    window.location.href = `/profile/${currentUser.user_name}`
+                } else {
+                    window.location.href = "/profile"
+                }
+            },
             soon: false,
             maintenance: false
         },
