@@ -198,7 +198,9 @@ export default function Home() {
   )
 
   return (
-    <Layout>
+    <Layout 
+      Tab="home"
+    >
       < div style={{ padding: "16px" }}>
         {<div style={{ borderBottom: "1px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
           <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} />

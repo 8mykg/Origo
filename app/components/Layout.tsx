@@ -35,7 +35,8 @@ type User = {
 }
 
 type LayoutProps = {
-    children: React.ReactNode
+    children: React.ReactNode,
+    Tab: string
 }
 
 const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, size?: number }) => (
@@ -53,7 +54,7 @@ const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, s
     </div>
 )
 
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({ children, Tab }: LayoutProps) {
     const isMobile = useIsMobile()
     const [posts, setPosts] = useState<Post[]>([])
     const [targetUrl, setTargetUrl] = useState<string | null>(null)
@@ -62,7 +63,7 @@ export default function Layout({ children }: LayoutProps) {
     const [input, setInput] = useState("")
     const [currentUser, setCurrentUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState("home")
+    const [activeTab, setActiveTab] = useState(Tab)
 
     useEffect(() => {
         const init = async () => {

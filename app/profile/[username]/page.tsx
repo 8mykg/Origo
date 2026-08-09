@@ -261,7 +261,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     if (loading) return <div style={{ background: "#000", minHeight: "100vh", color: "#fff", padding: "20px" }}>読み込み中...</div>
 
     return (
-        <Layout>
+        <Layout
+            Tab="profile"
+        >
             <div style={{ paddingBottom: "80px" }}>
                 {/* ヘッダー */}
                 <div style={{
