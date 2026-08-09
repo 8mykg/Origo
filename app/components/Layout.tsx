@@ -208,7 +208,10 @@ export default function Layout({ children, Tab }: LayoutProps) {
                 </svg>
             ),
             label: "ホーム",
-            action: () => setActiveTab("home")
+            action: () => {
+                setActiveTab("home")
+                window.location.href = "/"
+            },
         },
         {
             id: "notifications",
