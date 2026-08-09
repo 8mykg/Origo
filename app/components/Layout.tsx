@@ -244,6 +244,7 @@ export default function Layout({ children }: LayoutProps) {
             ),
             label: "プロフィール",
             action: () => {
+                setActiveTab("profile")
                 if (currentUser?.user_name) {
                     window.location.href = `/profile/${currentUser.user_name}`
                 } else {
