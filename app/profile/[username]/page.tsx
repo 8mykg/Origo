@@ -453,7 +453,15 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                             </div>
                             <p
                                 onClick={() => window.location.href = `/post/${post.id}`}
-                                style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5", cursor: "pointer" }}>
+                                style={{
+                                    margin: "0 0 12px",
+                                    fontSize: "15px",
+                                    lineHeight: "1.5",
+                                    cursor: "pointer",
+                                    wordBreak: "break-word", // ★これ！これで枠端で強制改行される！
+                                    whiteSpace: "pre-wrap",  // 💡（おまけ）Enterで手動改行したのもそのまま反映される！
+                                }}
+                            >
                                 {post.content}
                             </p>
                             <div style={{ display: "flex", gap: "16px" }}>
