@@ -198,7 +198,7 @@ export default function Home() {
   )
 
   return (
-    <Layout 
+    <Layout
       Tab="home"
     >
       < div style={{ padding: "16px" }}>
@@ -248,7 +248,14 @@ export default function Home() {
                 <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
                 <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
               </div>
-              <p style={{ margin: "0 0 12px", fontSize: "15px", lineHeight: "1.5" }}>
+              <p style={{
+                margin: "0 0 12px",
+                fontSize: "15px",
+                lineHeight: "1.5",
+                cursor: "pointer",
+                wordBreak: "break-word", // ★これ！これで枠端で強制改行される！
+                whiteSpace: "pre-wrap",  // 💡（おまけ）Enterで手動改行したのもそのまま反映される！
+              }}>
                 <LinkedText text={post.content} onLinkClick={(url) => setTargetUrl(url)} />
               </p>
               <div style={{ display: "flex", gap: "16px" }}>

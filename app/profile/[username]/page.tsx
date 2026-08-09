@@ -74,8 +74,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const [profileUser, setProfileUser] = useState<User | null>(null)  // 表示中のプロフの主
     const [posts, setPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
-
-    // 編集用の State
     const [editing, setEditing] = useState(false)
     const [displayName, setDisplayName] = useState("")
     const [newUserName, setNewUserName] = useState("")
@@ -83,11 +81,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const [avatarUrl, setAvatarUrl] = useState("")
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState("")
-
-    // フォロー用の State
     const [isFollowing, setIsFollowing] = useState(false)
     const [followersCount, setFollowersCount] = useState(0)
     const [followingCount, setFollowingCount] = useState(0)
+    const [targetUrl, setTargetUrl] = useState<string | null>(null)
 
     // リプライ用の State
     const [, setReplyingTo] = useState<Post | null>(null)
@@ -151,6 +148,33 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             }))
             setPosts(merged)
         }
+    }
+
+    const LinkedText = ({ text, onLinkClick }: { text: string; onLinkClick: (url: string) => void }) => {
+        const urlRegex = /(https?:\/\/[^\s]+)/g
+        const parts = text.split(urlRegex)
+
+        return (
+            <span>
+                {parts.map((part, i) =>
+                    urlRegex.test(part) ? (
+                        <span
+                            key={i}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onLinkClick(part)
+                            }}
+                            style={{ color: "#1d9bf0", cursor: "pointer", textDecoration: "underline" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                        >
+                            {part}
+                        </span>
+                    ) : (
+                        part
+                    )
+                )}
+            </span>
+        )
     }
 
     // 3. フォロー数の取得（follows 型を活用）
@@ -451,18 +475,15 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                 <span style={{ color: "#888", fontSize: "13px" }}>@{userName}</span>
                                 <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
                             </div>
-                            <p
-                                onClick={() => window.location.href = `/post/${post.id}`}
-                                style={{
-                                    margin: "0 0 12px",
-                                    fontSize: "15px",
-                                    lineHeight: "1.5",
-                                    cursor: "pointer",
-                                    wordBreak: "break-word", // ★これ！これで枠端で強制改行される！
-                                    whiteSpace: "pre-wrap",  // 💡（おまけ）Enterで手動改行したのもそのまま反映される！
-                                }}
-                            >
-                                {post.content}
+                            <p style={{
+                                margin: "0 0 12px",
+                                fontSize: "15px",
+                                lineHeight: "1.5",
+                                cursor: "pointer",
+                                wordBreak: "break-word", // ★これ！これで枠端で強制改行される！
+                                whiteSpace: "pre-wrap",  // 💡（おまけ）Enterで手動改行したのもそのまま反映される！
+                            }}>
+                                <LinkedText text={post.content} onLinkClick={(url) => setTargetUrl(url)} />
                             </p>
                             <div style={{ display: "flex", gap: "16px" }}>
                                 <button
