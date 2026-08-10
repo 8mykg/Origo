@@ -2,6 +2,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
+import React from "react"
 
 const useIsMobile = () => {
     const [isMobile, setIsMobile] = useState(false)
@@ -34,9 +35,19 @@ type User = {
     avatar_url?: string
 }
 
-type LayoutProps = {
-    children: React.ReactNode,
+type BarsProps = {
+    children: React.ReactNode
     Tab: string
+}
+
+export type ReplyProps = {
+    targetPost: {
+        id: string
+        user_name: string
+        content: string
+    } | null
+    onClose: () => void
+    onSuccess?: () => void
 }
 
 const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, size?: number }) => (
@@ -54,16 +65,10 @@ const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, s
     </div>
 )
 
-export default function Layout({ children, Tab }: LayoutProps) {
-    const isMobile = useIsMobile()
-    const [posts, setPosts] = useState<Post[]>([])
-    const [targetUrl, setTargetUrl] = useState<string | null>(null)
-    const [replyingTo, setReplyingTo] = useState<Post | null>(null)
-    const [replyInput, setReplyInput] = useState("")
-    const [input, setInput] = useState("")
-    const [currentUser, setCurrentUser] = useState<User | null>(null)
-    const [loading, setLoading] = useState(true)
+export default function Layout({ children, Tab }: BarsProps) {
     const [activeTab, setActiveTab] = useState(Tab)
+    const [currentUser, setCurrentUser] = useState<User | null>(null) // ★ ここに移動！
+    const isMobile = useIsMobile()
 
     useEffect(() => {
         const init = async () => {
@@ -82,121 +87,14 @@ export default function Layout({ children, Tab }: LayoutProps) {
             } else {
                 setCurrentUser(userData)
             }
-            setLoading(false)
         }
         init()
     }, [])
-
-    useEffect(() => { if (currentUser) fetchPosts() }, [currentUser])
-
-    const fetchPosts = async () => {
-        const { data: postsData } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
-        const { data: likesData } = await supabase.from("likes").select("*")
-        const { data: usersData } = await supabase.from("users").select("*")
-
-        if (postsData) {
-            const merged = postsData.map((post) => {
-                const postUser = usersData?.find((u) => u.user_name === post.user_name)
-                return {
-                    ...post,
-                    display_name: postUser?.display_name || post.user_name,
-                    avatar_url: postUser?.avatar_url || null,
-                    likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
-                    liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
-                }
-            })
-            setPosts(merged)
-        }
-    }
-
-    const handlePost = async () => {
-        if (!input.trim() || !currentUser) return
-        await supabase.from("posts").insert({ user_name: currentUser.user_name, content: input })
-        setInput("")
-        fetchPosts()
-    }
-
-    const handleLike = async (post: Post) => {
-        if (!currentUser) return
-        if (post.liked) {
-            await supabase.from("likes").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
-        } else {
-            await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
-        }
-        fetchPosts()
-    }
-
-    const handleReply = async () => {
-        if (!replyInput.trim() || !currentUser || !replyingTo) return
-        await supabase.from("posts").insert({
-            user_name: currentUser.user_name,
-            content: replyInput,
-            reply_to: replyingTo.id,
-        })
-
-        // リプライ数を更新
-        await supabase.from("posts")
-            .update({ reply_count: (replyingTo.reply_count || 0) + 1 })
-            .eq("id", replyingTo.id)
-
-        setReplyInput("")
-        setReplyingTo(null)
-        fetchPosts()
-    }
-
-    const LinkedText = ({ text, onLinkClick }: { text: string; onLinkClick: (url: string) => void }) => {
-        const urlRegex = /(https?:\/\/[^\s]+)/g
-        const parts = text.split(urlRegex)
-
-        return (
-            <span>
-                {parts.map((part, i) =>
-                    urlRegex.test(part) ? (
-                        <span
-                            key={i}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onLinkClick(part)
-                            }}
-                            style={{ color: "#1d9bf0", cursor: "pointer", textDecoration: "underline" }}
-                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                        >
-                            {part}
-                        </span>
-                    ) : (
-                        part
-                    )
-                )}
-            </span>
-        )
-    }
-
-    const handleDelete = async (postId: string) => {
-
-        await supabase.from("likes").delete().eq("post_id", postId)
-
-        const { error } = await supabase.from("posts").delete().eq("id", postId)
-
-        if (error) {
-            console.error("削除失敗:", error.message)
-            alert("削除できませんでした: " + error.message)
-            return
-        }
-
-        fetchPosts()
-    }
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
         window.location.href = "/auth"
     }
-
-    const formatDate = (str: string) => {
-        const d = new Date(str)
-        return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
-    }
-
-
 
     const navItems = [
         {
@@ -273,90 +171,8 @@ export default function Layout({ children, Tab }: LayoutProps) {
         },
     ]
 
-    const currentNavItem = navItems.find((item) => item.id === activeTab)
-    const isBlocked = currentNavItem?.soon || currentNavItem?.maintenance
-
-    // ※ navItems や isMobile, replyingTo などの処理をここにまとめる
     return (
         <div style={{ minHeight: "100vh", background: "#000", fontFamily: "sans-serif", color: "#fff", display: "flex", justifyContent: "space-between" }}>
-
-            {/* 1. リプライモーダル（共通） */}
-            {replyingTo && (<div style={{
-                position: "fixed", inset: 0,
-                background: "rgba(0,0,0,0.7)",
-                zIndex: 1000, display: "flex",
-                alignItems: "center", justifyContent: "center"
-            }}>
-                <div style={{
-                    background: "#111", border: "1px solid #333",
-                    borderRadius: "16px", padding: "24px",
-                    width: "500px", maxWidth: "90vw"
-                }}>
-                    {/* 元の投稿 */}
-                    <div style={{ display: "flex", gap: "12px", marginBottom: "16px", opacity: 0.7 }}>
-                        <Avatar url={replyingTo.avatar_url} name={replyingTo.user_name} size={36} />
-                        <div>
-                            <span style={{ fontWeight: "bold", fontSize: "14px" }}>{replyingTo.display_name}</span>
-                            <span style={{ color: "#888", fontSize: "13px", marginLeft: "8px" }}>@{replyingTo.user_name}</span>
-                            <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#ccc" }}>{replyingTo.content}</p>
-                        </div>
-                    </div>
-
-                    <div style={{ borderLeft: "2px solid #333", marginLeft: "18px", paddingLeft: "16px", marginBottom: "16px" }}>
-                        <span style={{ color: "#888", fontSize: "13px" }}>返信先: @{replyingTo.user_name}</span>
-                    </div>
-
-                    {/* リプライ入力 */}
-                    <div style={{ display: "flex", gap: "12px" }}>
-                        <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} size={36} />
-                        <textarea
-                            placeholder={`@${replyingTo.user_name}に返信`}
-                            value={replyInput}
-                            onChange={(e) => setReplyInput(e.target.value)}
-                            autoFocus
-                            style={{
-                                flex: 1, background: "transparent",
-                                border: "none", outline: "none",
-                                fontSize: "16px", resize: "none",
-                                color: "#fff", minHeight: "80px"
-                            }}
-                            rows={3}
-                        />
-                    </div>
-
-                    <div style={{
-                        display: "flex", justifyContent: "space-between",
-                        alignItems: "center", marginTop: "16px",
-                        borderTop: "1px solid #333", paddingTop: "12px"
-                    }}>
-                        <button
-                            onClick={() => { setReplyingTo(null); setReplyInput("") }}
-                            style={{
-                                background: "none", border: "none",
-                                color: "#888", cursor: "pointer", fontSize: "14px"
-                            }}>
-                            キャンセル
-                        </button>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <span style={{ color: replyInput.length > 300 ? "#f00" : "#888", fontSize: "14px" }}>
-                                {300 - replyInput.length}
-                            </span>
-                            <button
-                                onClick={handleReply}
-                                disabled={!replyInput.trim() || replyInput.length > 300}
-                                style={{
-                                    background: !replyInput.trim() || replyInput.length > 300 ? "#555" : "#1d9bf0",
-                                    color: "white", border: "none", borderRadius: "24px",
-                                    padding: "8px 20px", fontWeight: "bold",
-                                    cursor: !replyInput.trim() || replyInput.length > 300 ? "not-allowed" : "pointer"
-                                }}>
-                                返信する
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>)}
-
             {/* 2. 左サイドバー（共通：PC） */}
             {!isMobile && (<div style={{
                 width: "280px", padding: "20px 12px",
@@ -441,7 +257,7 @@ export default function Layout({ children, Tab }: LayoutProps) {
                 </div>
             </div>)}
 
-            {/* 3. メインコンテンツ領域（ここだけページごとに差し変わる！） */}
+            {/* 3. メインコンテンツ領域 */}
             <div style={{ flex: 1, borderRight: isMobile ? "none" : "1px solid #333", borderLeft: isMobile ? "none" : "1px solid #333", paddingBottom: isMobile ? "80px" : "0" }}>
                 {children}
             </div>
@@ -527,4 +343,136 @@ export default function Layout({ children, Tab }: LayoutProps) {
             )}
         </div>
     )
+}
+
+export function Reply({ targetPost, onClose, onSuccess }: ReplyProps) {
+    const [replyInput, setReplyInput] = useState("")
+    const [submitting, setSubmitting] = useState(false)
+
+    if (!targetPost) return null
+
+    const handleSendReply = async () => {
+        if (!replyInput.trim() || submitting) return
+        setSubmitting(true)
+
+        // ★ ログイン中のユーザー情報を取得
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+            alert("ログインが必要です")
+            setSubmitting(false)
+            return
+        }
+
+        const { data: userData } = await supabase
+            .from("users")
+            .select("user_name")
+            .eq("id", session.user.id)
+            .single()
+
+        if (!userData) {
+            alert("ユーザー情報が見つかりません")
+            setSubmitting(false)
+            return
+        }
+
+        const { error } = await supabase.from("posts").insert({
+            user_name: userData.user_name,
+            content: replyInput.trim(),
+            reply_to: targetPost.id,
+        })
+
+        if (error) {
+            alert("返信に失敗しました: " + error.message)
+        } else {
+            await supabase
+                .from("posts")
+                .update({ reply_count: (targetPost as any).reply_count ? (targetPost as any).reply_count + 1 : 1 })
+                .eq("id", targetPost.id)
+
+            setReplyInput("")
+            onClose()
+            if (onSuccess) onSuccess()
+        }
+        setSubmitting(false)
+    }
+
+    return (
+        <div
+            onClick={onClose}
+            style={{
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                background: "rgba(91, 112, 131, 0.4)", display: "flex",
+                justifyContent: "center", alignItems: "flex-start", paddingTop: "60px", zIndex: 1000
+            }}
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    background: "#000", border: "1px solid #333", borderRadius: "16px",
+                    width: "100%", maxWidth: "600px", padding: "20px", color: "#fff"
+                }}
+            >
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
+                    <button onClick={onClose} style={{ background: "none", border: "none", color: "#fff", fontSize: "18px", cursor: "pointer" }}>
+                        ✕
+                    </button>
+                </div>
+
+                <div style={{ borderLeft: "2px solid #333", paddingLeft: "12px", color: "#888", fontSize: "14px", marginBottom: "16px" }}>
+                    <span style={{ color: "#fff", fontWeight: "bold" }}>@{targetPost.user_name}</span>
+                    <p style={{ margin: "4px 0 0", color: "#aaa" }}>{targetPost.content}</p>
+                </div>
+
+                <textarea
+                    placeholder="返信をポスト"
+                    value={replyInput}
+                    onChange={(e) => setReplyInput(e.target.value)}
+                    style={{
+                        width: "100%", background: "#000", color: "#fff", border: "none",
+                        outline: "none", resize: "none", minHeight: "120px", fontSize: "16px",
+                        boxSizing: "border-box"
+                    }}
+                />
+
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+                    <button
+                        onClick={handleSendReply}
+                        disabled={submitting || !replyInput.trim()}
+                        style={{
+                            background: replyInput.trim() ? "#1d9bf0" : "#555", color: "#fff",
+                            border: "none", padding: "8px 20px", borderRadius: "20px",
+                            fontWeight: "bold", cursor: replyInput.trim() ? "pointer" : "not-allowed"
+                        }}
+                    >
+                        {submitting ? "送信中..." : "返信"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export const sendReply = async ({
+    currentUser,
+    targetPostId,
+    replyInput
+}: {
+    currentUser: { user_name: string } | null
+    targetPostId: string
+    replyInput: string
+}) => {
+    if (!currentUser || !replyInput.trim()) return false
+
+    const { error } = await supabase.from("posts").insert({
+        user_name: currentUser.user_name,
+        content: replyInput.trim(),
+        reply_to: targetPostId,
+    })
+
+    if (error) {
+        alert("返信に失敗しました: " + error.message)
+        return false
+    }
+
+    return true
 }

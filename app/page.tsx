@@ -2,7 +2,6 @@
 export const dynamic = "force-dynamic"
 import { useState, useEffect } from "react"
 import { supabase } from "./lib/supabase"
-import Layout from "./components/Layout"
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
@@ -13,6 +12,9 @@ const useIsMobile = () => {
   }, [])
   return isMobile
 }
+import Layout from "./components/Layout"
+import { Reply } from "./components/Layout"
+
 
 type Post = {
   id: string
@@ -37,12 +39,11 @@ type User = {
 export default function Home() {
   const isMobile = useIsMobile()
   const [posts, setPosts] = useState<Post[]>([])
-  const [targetUrl, setTargetUrl] = useState<string | null>(null)
-  const [replyingTo, setReplyingTo] = useState<Post | null>(null)
-  const [replyInput, setReplyInput] = useState("")
   const [input, setInput] = useState("")
+  const [targetUrl, setTargetUrl] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [replyingTo, setReplyingTo] = useState<any | null>(null)
   const [activeTab, setActiveTab] = useState("home")
 
   useEffect(() => {
@@ -103,24 +104,6 @@ export default function Home() {
     } else {
       await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
     }
-    fetchPosts()
-  }
-
-  const handleReply = async () => {
-    if (!replyInput.trim() || !currentUser || !replyingTo) return
-    await supabase.from("posts").insert({
-      user_name: currentUser.user_name,
-      content: replyInput,
-      reply_to: replyingTo.id,
-    })
-
-    // リプライ数を更新
-    await supabase.from("posts")
-      .update({ reply_count: (replyingTo.reply_count || 0) + 1 })
-      .eq("id", replyingTo.id)
-
-    setReplyInput("")
-    setReplyingTo(null)
     fetchPosts()
   }
 
@@ -316,12 +299,18 @@ export default function Home() {
                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                     </svg>
                   </button>
+
                 )}
               </div>
             </div>
           </div>
         ))}
       </div>
-    </Layout >
+      <Reply
+        targetPost={replyingTo}
+        onClose={() => setReplyingTo(null)}
+        onSuccess={fetchPosts} // 送信成功したら投稿一覧を再取得！
+      />
+    </Layout>
   )
 }

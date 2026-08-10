@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react"
 import { supabase } from "../../lib/supabase"
 import Layout from "../../components/Layout"
+import { Reply } from "../../components/Layout"
 // ----------------------------------------------------
 // 型定義（君の定義をそのまま適用！）
 // ----------------------------------------------------
@@ -69,10 +70,10 @@ const AvatarUpload = ({
 // ----------------------------------------------------
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
     const { username: userNameParam } = use(params)
-
     const [currentUser, setCurrentUser] = useState<User | null>(null) // ログイン中の自分
     const [profileUser, setProfileUser] = useState<User | null>(null)  // 表示中のプロフの主
     const [posts, setPosts] = useState<Post[]>([])
+    const [replyingTo, setReplyingTo] = useState<any | null>(null)
     const [loading, setLoading] = useState(true)
     const [editing, setEditing] = useState(false)
     const [displayName, setDisplayName] = useState("")
@@ -85,10 +86,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const [followersCount, setFollowersCount] = useState(0)
     const [followingCount, setFollowingCount] = useState(0)
     const [targetUrl, setTargetUrl] = useState<string | null>(null)
-
-    // リプライ用の State
-    const [, setReplyingTo] = useState<Post | null>(null)
-
     const userName = userNameParam || ""
     const isOwnProfile = currentUser?.user_name === userName
 
@@ -269,11 +266,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             return
         }
         fetchPosts(userName, currentUser?.user_name)
-    }
-
-    const handleLogout = async () => {
-        await supabase.auth.signOut()
-        window.location.href = "/auth"
     }
 
     const formatDate = (str: string) => {
@@ -549,6 +541,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     </div>
                 ))}
             </div>
+            <Reply
+                targetPost={replyingTo}
+                onClose={() => setReplyingTo(null)}
+            />
         </Layout>
     )
 }

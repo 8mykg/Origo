@@ -3,7 +3,7 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: "Origo",
-  description: ".",
+  description: "原点がすべて、ここにある",
   icons: {
     icon: "/logo-icon.svg",
     apple: "/logo-icon.svg",
