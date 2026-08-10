@@ -2,6 +2,7 @@
 export const dynamic = "force-dynamic"
 import { useState, useEffect } from "react"
 import { supabase } from "./lib/supabase"
+import { useRouter } from "next/navigation"
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<any | null>(null)
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("home")
 
   useEffect(() => {
@@ -219,7 +221,7 @@ export default function Home() {
           </div>
         </div>}
         {posts.map((post) => (
-          <div key={post.id} style={{ borderBottom: "1px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
+          <div key={post.id} onClick={() => router.push(`/post/${post.id}`)} style={{ borderBottom: "1px solid #333", cursor: "pointer", padding: "16px 20px", display: "flex", gap: "12px" }}>
             <button
               onClick={() => window.location.href = `/profile/${post.user_name}`}
               style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
@@ -244,7 +246,10 @@ export default function Home() {
               <div style={{ display: "flex", gap: "16px" }}>
                 {/* いいねボタン */}
                 <button
-                  onClick={() => handleLike(post)}
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleLike(post);
+                  }}
                   style={{
                     background: "none", border: "none",
                     cursor: "pointer",
@@ -266,7 +271,10 @@ export default function Home() {
                 </button>
                 {/* リプライボタン */}
                 <button
-                  onClick={() => setReplyingTo(post)}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setReplyingTo(post);
+                  }}
                   style={{
                     background: "none", border: "none",
                     cursor: "pointer", color: "#888",

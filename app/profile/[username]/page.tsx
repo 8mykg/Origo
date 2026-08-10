@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react"
 import { supabase } from "../../lib/supabase"
 import Layout from "../../components/Layout"
+import { useRouter } from "next/navigation"
 import { Reply } from "../../components/Layout"
 // ----------------------------------------------------
 // 型定義（君の定義をそのまま適用！）
@@ -73,6 +74,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const [currentUser, setCurrentUser] = useState<User | null>(null) // ログイン中の自分
     const [profileUser, setProfileUser] = useState<User | null>(null)  // 表示中のプロフの主
     const [posts, setPosts] = useState<Post[]>([])
+    const router = useRouter()
     const [replyingTo, setReplyingTo] = useState<any | null>(null)
     const [loading, setLoading] = useState(true)
     const [editing, setEditing] = useState(false)
@@ -449,7 +451,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
                 {/* 投稿一覧 */}
                 {posts.map((post) => (
-                    <div key={post.id} style={{ borderBottom: "1px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
+                    <div key={post.id} onClick={() => router.push(`/post/${post.id}`)} style={{ borderBottom: "1px solid #333", cursor: "pointer", padding: "16px 20px", display: "flex", gap: "12px" }}>
                         <div style={{
                             width: "44px", height: "44px", borderRadius: "50%",
                             background: avatarUrl ? "transparent" : "#1d9bf0",
@@ -479,7 +481,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                             </p>
                             <div style={{ display: "flex", gap: "16px" }}>
                                 <button
-                                    onClick={() => handleLike(post)}
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        handleLike(post);
+                                    }}
                                     style={{
                                         background: "none", border: "none",
                                         cursor: "pointer",
@@ -502,7 +507,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
                                 {/* リプライボタン */}
                                 <button
-                                    onClick={() => setReplyingTo(post)}
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        setReplyingTo(post);
+                                    }}
                                     style={{
                                         background: "none", border: "none",
                                         cursor: "pointer", color: "#888",
