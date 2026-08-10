@@ -15,6 +15,22 @@ type Post = {
   reply_count?: number
 }
 
+// ★ アバター用コンポーネント（Layout と同じスタイル）
+const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, size?: number }) => (
+  <div style={{
+    width: size, height: size, borderRadius: "50%",
+    background: url ? "transparent" : "#1d9bf0",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontWeight: "bold", fontSize: size * 0.4, color: "#fff",
+    overflow: "hidden", flexShrink: 0
+  }}>
+    {url
+      ? <img src={url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      : name[0]?.toUpperCase()
+    }
+  </div>
+)
+
 export default function PostDetailPage() {
   const params = useParams()
   const postId = params.id as string
@@ -31,30 +47,53 @@ export default function PostDetailPage() {
     if (!postId) return
     setLoading(true)
 
-    // 親投稿の取得
+    // 親投稿の取得（users テーブルを結合して avatar_url と display_name を取得）
     const { data: postData, error: postError } = await supabase
       .from("posts")
-      .select("*")
+      .select(`
+      *,
+      users (
+        avatar_url,
+        display_name
+      )
+    `)
       .eq("id", postId)
       .single()
 
-    if (postError) {
+    if (postError || !postData) {
       console.error("投稿の取得に失敗:", postError)
       setLoading(false)
       return
     }
 
-    setMainPost(postData)
+    // users の情報をフラットに整形してセット
+    const formattedMainPost = {
+      ...postData,
+      avatar_url: postData.users?.avatar_url,
+      display_name: postData.users?.display_name || postData.user_name,
+    }
+    setMainPost(formattedMainPost)
 
-    // この投稿に対する返信一覧の取得
+    // この投稿に対する返信一覧の取得（こちらも同様に users を結合）
     const { data: replyData, error: replyError } = await supabase
       .from("posts")
-      .select("*")
+      .select(`
+      *,
+      users (
+        avatar_url,
+        display_name
+      )
+    `)
       .eq("reply_to", postId)
-      .order("created_at", { ascending: true }) // 古い順（会話の流れ順）
+      .order("created_at", { ascending: true })
 
     if (!replyError && replyData) {
-      setReplies(replyData)
+      const formattedReplies = replyData.map((reply: any) => ({
+        ...reply,
+        avatar_url: reply.users?.avatar_url,
+        display_name: reply.users?.display_name || reply.user_name,
+      }))
+      setReplies(formattedReplies)
     }
 
     setLoading(false)
@@ -100,9 +139,17 @@ export default function PostDetailPage() {
       </div>
 
       {/* 2. 親ポスト（メインの投稿） */}
-      <div style={{ padding: "16px", borderBottom: "1px solid #333" }}>
-        <div style={{ fontWeight: "bold", fontSize: "16px", marginBottom: "4px" }}>
-          @{mainPost.user_name}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+        <Avatar url={mainPost.avatar_url} name={mainPost.display_name || mainPost.user_name} size={48} />
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {/* 表示名 */}
+          <span style={{ fontWeight: "bold", fontSize: "16px", color: "#fff" }}>
+            {mainPost.display_name || mainPost.user_name}
+          </span>
+          {/* ユーザー名 */}
+          <span style={{ fontSize: "14px", color: "#888" }}>
+            @{mainPost.user_name}
+          </span>
         </div>
         <p style={{ fontSize: "18px", lineHeight: "1.5", margin: "12px 0", whiteSpace: "pre-wrap" }}>
           {mainPost.content}
@@ -116,11 +163,15 @@ export default function PostDetailPage() {
           <button
             onClick={() => setReplyingTo(mainPost)}
             style={{
-              background: "none", border: "none", color: "#888",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: "6px"
-            }}
-          >
-            💬 <span>{mainPost.reply_count || 0}</span>
+              background: "none", border: "none",
+              cursor: "pointer", color: "#888",
+              fontSize: "14px", display: "flex",
+              alignItems: "center", gap: "6px",
+              padding: "4px 8px", borderRadius: "20px"
+            }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
           </button>
         </div>
       </div>
@@ -171,6 +222,6 @@ export default function PostDetailPage() {
         onClose={() => setReplyingTo(null)}
         onSuccess={fetchPostAndReplies} // 返信できたら再読み込み！
       />
-    </Layout>
+    </Layout >
   )
 }
