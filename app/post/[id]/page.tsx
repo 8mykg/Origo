@@ -37,7 +37,6 @@ const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, s
 export default function PostDetailPage() {
   const params = useParams()
   const postId = params.id as string
-
   const [mainPost, setMainPost] = useState<Post | null>(null)
   const [replies, setReplies] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,61 +45,72 @@ export default function PostDetailPage() {
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
 
   // 1. 投稿データと返信一覧の取得
-  // 1. 投稿データと返信一覧の取得
   const fetchPostAndReplies = async () => {
     if (!postId) return
     setLoading(true)
 
-    // 親投稿の取得（users テーブルを結合して avatar_url と display_name を取得）
-    const { data: postData, error: postError } = await supabase
-      .from("posts")
-      .select(`
-      *,
-      users (
-        avatar_url,
-        display_name
-      )
-    `)
-      .eq("id", postId)
-      .single()
+    try {
+      // 1. 親投稿（メインポスト）を取得
+      const { data: postData, error: postError } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("id", postId)
+        .single()
 
-    if (postError || !postData) {
-      console.error("投稿の取得に失敗:", postError)
+      if (postError || !postData) {
+        console.error("投稿の取得に失敗:", postError)
+        setLoading(false)
+        return
+      }
+
+      // 2. 親投稿のユーザー情報を user_name で取得
+      const { data: mainUserData } = await supabase
+        .from("users")
+        .select("avatar_url, display_name")
+        .eq("user_name", postData.user_name)
+        .single()
+
+      // ユーザー情報を合体させて State にセット
+      setMainPost({
+        ...postData,
+        avatar_url: mainUserData?.avatar_url,
+        display_name: mainUserData?.display_name || postData.user_name,
+      })
+
+      // 3. この投稿に対する返信一覧を取得
+      const { data: replyData, error: replyError } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("reply_to", postId)
+        .order("created_at", { ascending: true })
+
+      if (!replyError && replyData && replyData.length > 0) {
+        // 返信したユーザーたちの情報を一括取得（重複排除）
+        const userNames = Array.from(new Set(replyData.map((r) => r.user_name)))
+        const { data: usersData } = await supabase
+          .from("users")
+          .select("user_name, avatar_url, display_name")
+          .in("user_name", userNames)
+
+        // ユーザー情報をマッピングして返信一覧を作成
+        const formattedReplies = replyData.map((reply) => {
+          const user = usersData?.find((u) => u.user_name === reply.user_name)
+          return {
+            ...reply,
+            avatar_url: user?.avatar_url,
+            display_name: user?.display_name || reply.user_name,
+          }
+        })
+
+        setReplies(formattedReplies)
+      } else {
+        setReplies([])
+      }
+    } catch (err) {
+      console.error("予期せぬエラーが発生しました:", err)
+    } finally {
       setLoading(false)
-      return
     }
-
-    // users の情報をフラットに整形してセット
-    const formattedMainPost = {
-      ...postData,
-      avatar_url: postData.users?.avatar_url,
-      display_name: postData.users?.display_name || postData.user_name,
-    }
-    setMainPost(formattedMainPost)
-
-    // この投稿に対する返信一覧の取得（こちらも同様に users を結合）
-    const { data: replyData, error: replyError } = await supabase
-      .from("posts")
-      .select(`
-      *,
-      users (
-        avatar_url,
-        display_name
-      )
-    `)
-      .eq("reply_to", postId)
-      .order("created_at", { ascending: true })
-
-    if (!replyError && replyData) {
-      const formattedReplies = replyData.map((reply: any) => ({
-        ...reply,
-        avatar_url: reply.users?.avatar_url,
-        display_name: reply.users?.display_name || reply.user_name,
-      }))
-      setReplies(formattedReplies)
-    }
-
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -143,26 +153,34 @@ export default function PostDetailPage() {
       </div>
 
       {/* 2. 親ポスト（メインの投稿） */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-        <Avatar url={mainPost.avatar_url} name={mainPost.display_name || mainPost.user_name} size={48} />
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {/* 表示名 */}
-          <span style={{ fontWeight: "bold", fontSize: "16px", color: "#fff" }}>
-            {mainPost.display_name || mainPost.user_name}
-          </span>
-          {/* ユーザー名 */}
-          <span style={{ fontSize: "14px", color: "#888" }}>
-            @{mainPost.user_name}
-          </span>
-        </div>
-        <p style={{ fontSize: "18px", lineHeight: "1.5", margin: "12px 0", whiteSpace: "pre-wrap" }}>
+      <div style={{ padding: "16px", borderBottom: "1px solid #333" }}>
+
+        {/* ① ヘッダー部分（アバターと名前だけを横並びに！） */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+          <Avatar url={mainPost.avatar_url} name={mainPost.display_name || mainPost.user_name} size={48} />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {/* 表示名 */}
+            <span style={{ fontWeight: "bold", fontSize: "16px", color: "#fff" }}>
+              {mainPost.display_name || mainPost.user_name}
+            </span>
+            {/* ユーザー名 */}
+            <span style={{ fontSize: "14px", color: "#888" }}>
+              @{mainPost.user_name}
+            </span>
+          </div>
+        </div> {/* ← ここで横並び用 div を閉じるのが超重要！ */}
+
+        {/* ② 本文（ヘッダーの下に配置） */}
+        <p style={{ fontSize: "18px", lineHeight: "1.5", margin: "12px 0", whiteSpace: "pre-wrap", color: "#fff" }}>
           {mainPost.content}
         </p>
+
+        {/* ③ 投稿日時（本文の下に配置） */}
         <div style={{ color: "#888", fontSize: "13px", marginBottom: "12px" }}>
           {new Date(mainPost.created_at).toLocaleString("ja-JP")}
         </div>
 
-        {/* アクション領域（返信ボタン） */}
+        {/* ④ アクション領域（一番下に配置） */}
         <div style={{ borderTop: "1px solid #222", paddingTop: "12px" }}>
           <button
             onClick={() => setReplyingTo(mainPost)}
@@ -176,8 +194,10 @@ export default function PostDetailPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
+            <span>{mainPost.reply_count || 0}</span>
           </button>
         </div>
+
       </div>
 
       {/* 3. 返信（リプライ）一覧 */}
@@ -194,26 +214,61 @@ export default function PostDetailPage() {
                 padding: "16px",
                 borderBottom: "1px solid #222",
                 display: "flex",
-                flexDirection: "column",
-                gap: "6px"
+                gap: "12px" // 左にアバター、右にコンテンツを並べる
               }}
             >
-              <div style={{ fontWeight: "bold", fontSize: "14px", color: "#ccc" }}>
-                @{reply.user_name}
-              </div>
-              <p style={{ margin: 0, fontSize: "15px", whiteSpace: "pre-wrap" }}>
-                {reply.content}
-              </p>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
-                <button
-                  onClick={() => setReplyingTo(reply)}
-                  style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "13px" }}
-                >
-                  💬 {reply.reply_count || 0}
-                </button>
-                <span style={{ color: "#555", fontSize: "12px" }}>
-                  {new Date(reply.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
-                </span>
+              {/* 左側：アバター */}
+              <Avatar
+                url={reply.avatar_url}
+                name={reply.display_name || reply.user_name}
+                size={40}
+              />
+
+              {/* 右側：名前・本文・アクション */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+
+                {/* ヘッダー：表示名 & ユーザー名 */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: "bold", fontSize: "15px", color: "#fff" }}>
+                    {reply.display_name || reply.user_name}
+                  </span>
+                  <span style={{ fontSize: "13px", color: "#888" }}>
+                    @{reply.user_name}
+                  </span>
+                </div>
+
+                {/* 返信本文 */}
+                <p style={{
+                  margin: "6px 0 10px",
+                  fontSize: "15px",
+                  lineHeight: "1.4",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  color: "#eee"
+                }}>
+                  {reply.content}
+                </p>
+
+                {/* フッター：返信ボタン & 時間 */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <button
+                    onClick={() => setReplyingTo(reply)}
+                    style={{
+                      background: "none", border: "none", color: "#888",
+                      cursor: "pointer", fontSize: "13px", display: "flex",
+                      alignItems: "center", gap: "4px", padding: 0
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <span>{reply.reply_count || 0}</span>
+                  </button>
+                  <span style={{ color: "#555", fontSize: "12px" }}>
+                    {new Date(reply.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+
               </div>
             </div>
           ))

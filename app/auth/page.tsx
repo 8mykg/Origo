@@ -49,7 +49,7 @@ export default function AuthPage() {
     } else {
 
       if (!Invitationcode.trim()) {
-        setError("招待コードを入力してください")
+        setError("招待コードを入力してください(開発者に聞け)")
         setLoading(false)
         return
       }

@@ -46,7 +46,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<any | null>(null)
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState("home")
 
   useEffect(() => {
     const init = async () => {
