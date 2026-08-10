@@ -5,6 +5,12 @@ import { supabase } from "../lib/supabase"
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
+  const [Invitationcode, setInvitationcode] = useState("")
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, "0")
+  const day = String(today.getDate()).padStart(2, "0")
+  const SECRET_INVITATION_CODE = `Origo.tumayouzi${year}-${month}-${day}野獣先輩`
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -41,6 +47,20 @@ export default function AuthPage() {
         window.location.href = "/"
       }
     } else {
+
+      if (!Invitationcode.trim()) {
+        setError("招待コードを入力してください")
+        setLoading(false)
+        return
+      }
+
+      if (Invitationcode.trim() !== SECRET_INVITATION_CODE) {
+        setError("招待コードが正しくありません、または期限切れです")
+        setLoading(false)
+        return
+      }
+
+
       if (!userName.trim()) {
         setError("ユーザー名を入力してください")
         setLoading(false)
@@ -208,6 +228,13 @@ export default function AuthPage() {
           {/* ユーザー名（新規登録のみ） */}
           {!isLogin && (
             <>
+              <input
+                placeholder="招待コード"
+                value={Invitationcode}
+                onChange={(e) => setInvitationcode(e.target.value)}
+                style={inputStyle}
+              />
+
               <input
                 placeholder="ユーザー名(@なし)"
                 value={userName}
