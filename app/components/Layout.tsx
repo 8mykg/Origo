@@ -424,7 +424,7 @@ export function Reply({ targetPost, onClose, onSuccess }: ReplyProps) {
                 </div>
 
                 <textarea
-                    placeholder="返信をポスト"
+                    placeholder="どう思う？"
                     value={replyInput}
                     onChange={(e) => setReplyInput(e.target.value)}
                     style={{
@@ -434,14 +434,27 @@ export function Reply({ targetPost, onClose, onSuccess }: ReplyProps) {
                     }}
                 />
 
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "12px", marginTop: "12px" }}>
+
+                    {/* 残り文字数表示 (300文字を超えたら赤字にする) */}
+                    <span style={{
+                        fontSize: "13px",
+                        color: replyInput.length > 300 ? "#f00" : "#888"
+                    }}>
+                        {300 - replyInput.length}
+                    </span>
+
                     <button
                         onClick={handleSendReply}
-                        disabled={submitting || !replyInput.trim()}
+                        disabled={submitting || !replyInput.trim() || replyInput.length > 300}
                         style={{
-                            background: replyInput.trim() ? "#1d9bf0" : "#555", color: "#fff",
-                            border: "none", padding: "8px 20px", borderRadius: "20px",
-                            fontWeight: "bold", cursor: replyInput.trim() ? "pointer" : "not-allowed"
+                            background: !replyInput.trim() || replyInput.length > 300 ? "#555" : "#1d9bf0",
+                            color: "#fff",
+                            border: "none",
+                            padding: "8px 20px",
+                            borderRadius: "20px",
+                            fontWeight: "bold",
+                            cursor: !replyInput.trim() || replyInput.length > 300 ? "not-allowed" : "pointer"
                         }}
                     >
                         {submitting ? "送信中..." : "返信"}
