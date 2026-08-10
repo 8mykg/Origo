@@ -8,9 +8,12 @@ import Layout, { Reply } from "../../components/Layout"
 type Post = {
   id: string
   user_name: string
-  display_name?: string
+  display_name?: string  // ★ これを追加！
   content: string
   created_at: string
+  likes?: number
+  liked?: boolean
+  avatar_url?: string    // ★ これを追加！
   reply_to?: string | null
   reply_count?: number
 }
@@ -42,6 +45,7 @@ export default function PostDetailPage() {
   // モーダル用 State
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
 
+  // 1. 投稿データと返信一覧の取得
   // 1. 投稿データと返信一覧の取得
   const fetchPostAndReplies = async () => {
     if (!postId) return
