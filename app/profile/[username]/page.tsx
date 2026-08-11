@@ -19,6 +19,7 @@ type Post = {
     avatar_url?: string
     reply_to?: string | null
     reply_count?: number
+    reply_to_user?: string | null // ★ これを追加！
 }
 
 type User = {
@@ -128,23 +129,37 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
     // 2. 投稿一覧取得
     const fetchPosts = async (targetUserName: string, myUserName?: string) => {
+        // ① ターゲットユーザーの投稿を取得
         const { data: postsData } = await supabase
             .from("posts")
             .select("*")
             .eq("user_name", targetUserName)
             .order("created_at", { ascending: false })
 
+        // ② 返信先（親ポスト）のユーザー名を調べるため、全投稿を一緒に取得
+        const { data: allPostsData } = await supabase.from("posts").select("*")
         const { data: likesData } = await supabase.from("likes").select("*")
 
         if (postsData) {
-            // ↓ (post: Post) と (l: { post_id: string; user_name: string }) で「型」を指定してあげる！
-            const merged: Post[] = postsData.map((post: Post) => ({
-                ...post,
-                display_name: profileUser?.display_name || post.user_name,
-                avatar_url: profileUser?.avatar_url || undefined,
-                likes: likesData?.filter((l: { post_id: string; user_name: string }) => l.post_id === post.id).length || 0,
-                liked: likesData?.some((l: { post_id: string; user_name: string }) => l.post_id === post.id && l.user_name === myUserName),
-            }))
+            const merged: Post[] = postsData.map((post: any) => {
+                // 返信先（親ポスト）の投稿者を探す
+                let replyToUser = null
+                if (post.reply_to) {
+                    const parentPost = allPostsData?.find((p) => p.id === post.reply_to)
+                    if (parentPost) {
+                        replyToUser = parentPost.user_name
+                    }
+                }
+
+                return {
+                    ...post,
+                    display_name: profileUser?.display_name || post.user_name,
+                    avatar_url: profileUser?.avatar_url || undefined,
+                    likes: likesData?.filter((l: { post_id: string; user_name: string }) => l.post_id === post.id).length || 0,
+                    liked: likesData?.some((l: { post_id: string; user_name: string }) => l.post_id === post.id && l.user_name === myUserName),
+                    reply_to_user: replyToUser, // ★ 返信先のユーザー名を追加！
+                }
+            })
             setPosts(merged)
         }
     }
@@ -469,17 +484,27 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                 <span style={{ color: "#888", fontSize: "13px" }}>@{userName}</span>
                                 <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
                             </div>
+
+                            {/* ★ ここを追加！ 返信先がある場合のみ表示 */}
+                            {post.reply_to_user && (
+                                <div style={{ color: "#888", fontSize: "13px", marginBottom: "4px" }}>
+                                    返信先: <span style={{ color: "#1d9bf0" }}>@{post.reply_to_user}</span> さん
+                                </div>
+                            )}
+
                             <p style={{
                                 margin: "0 0 0px",
                                 fontSize: "15px",
                                 lineHeight: "1.5",
                                 cursor: "pointer",
-                                wordBreak: "break-word", // ★これ！これで枠端で強制改行される！
-                                whiteSpace: "pre-wrap",  // 💡（おまけ）Enterで手動改行したのもそのまま反映される！
+                                wordBreak: "break-word",
+                                whiteSpace: "pre-wrap",
                             }}>
                                 <LinkedText text={post.content} onLinkClick={(url) => setTargetUrl(url)} />
                             </p>
+
                             <div style={{ display: "flex", gap: "16px" }}>
+                                {/* いいねボタン */}
                                 <button
                                     onClick={e => {
                                         e.stopPropagation();
@@ -494,13 +519,17 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                         padding: "4px 8px", borderRadius: "20px"
                                     }}>
                                     {post.liked ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor" />
-                                        </svg>
+                                        <img
+                                            src={"/heart-filled.svg"}
+                                            alt="liked"
+                                            style={{ width: "16px", height: "16px" }}
+                                        />
                                     ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                        </svg>
+                                        <img
+                                            src={"/heart.svg"}
+                                            alt="activelyliked"
+                                            style={{ width: "16px", height: "16px" }}
+                                        />
                                     )}
                                     <span>{post.likes}</span>
                                 </button>
@@ -518,15 +547,21 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                         alignItems: "center", gap: "6px",
                                         padding: "4px 8px", borderRadius: "20px"
                                     }}>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                    </svg>
+                                    <img
+                                        src={"/comment.svg"}
+                                        alt="comment"
+                                        style={{ width: "16px", height: "16px" }}
+                                    />
                                     {post.reply_count || 0}
                                 </button>
+
                                 {/* 自分の投稿だけ削除ボタン表示 */}
                                 {post.user_name === currentUser?.user_name && (
                                     <button
-                                        onClick={() => handleDelete(post.id)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDelete(post.id);
+                                        }}
                                         style={{
                                             marginLeft: "auto", background: "none",
                                             border: "none", cursor: "pointer",

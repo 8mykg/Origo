@@ -2,8 +2,8 @@
 "use client"
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
+import { useRouter } from "next/navigation"
 import React from "react"
-
 const useIsMobile = () => {
     const [isMobile, setIsMobile] = useState(false)
     useEffect(() => {
@@ -65,9 +65,24 @@ const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, s
     </div>
 )
 
-export default function Layout({ children, Tab }: BarsProps) {
+export default function Layout({ children, Tab }: { children: React.ReactNode; Tab?: string }) {
+    const router = useRouter()
+    const [searchQuery, setSearchQuery] = useState("")
+
+    // 検索実行（Enterキー）
+    const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && searchQuery.trim()) {
+            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+        }
+    }
+
+    // ハッシュタグクリック
+    const handleTagClick = (tag: string) => {
+        router.push(`/search?q=${encodeURIComponent(tag)}`)
+    }
     const [activeTab, setActiveTab] = useState(Tab)
     const [currentUser, setCurrentUser] = useState<User | null>(null) // ★ ここに移動！
+
     const isMobile = useIsMobile()
 
     useEffect(() => {
@@ -110,6 +125,22 @@ export default function Layout({ children, Tab }: BarsProps) {
                 setActiveTab("home")
                 window.location.href = "/"
             },
+        },
+        {
+            id: "settings",
+            icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="10" cy="10" r="7.5"></circle>
+                    <line x1="21" y1="21" x2="15.3" y2="15.3"></line>
+                </svg>
+            ),
+            label: "検索",
+            action: () => {
+                setActiveTab("search"),
+                    window.location.href = "/search"
+            },
+            soon: false,
+            maintenance: false
         },
         {
             id: "notifications",
@@ -263,58 +294,94 @@ export default function Layout({ children, Tab }: BarsProps) {
             </div>
 
             {/* 4. 右サイドバー（共通：PC） */}
-            {!isMobile && (<div style={{
-                width: "320px", padding: "20px 16px",
-                position: "sticky", top: 0, height: "100vh",
-                overflowY: "auto", flexShrink: 0,
-                borderLeft: "1px solid #333"
-            }}>
-                {/* 検索欄 */}
-                <div style={{ position: "relative", marginBottom: "16px" }}>
-                    <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>🔍</span>
-                    <input
-                        placeholder="検索（開発中）"
-                        disabled
-                        style={{
-                            width: "100%", background: "#111",
-                            border: "1px solid #333", borderRadius: "24px",
-                            padding: "12px 12px 12px 44px",
-                            color: "#555", fontSize: "15px",
-                            outline: "none", boxSizing: "border-box",
-                            cursor: "not-allowed"
-                        }}
-                    />
-                </div>
-
-                {/* トレンド */}
-                <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
-                    <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>トレンド</h2>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                        {["#Origo", "#SNS開発", "#Next_js", "#Supabase"].map((tag, i) => (
-                            <div key={i} style={{ borderBottom: i < 3 ? "1px solid #222" : "none", paddingBottom: i < 3 ? "12px" : "0" }}>
-                                <p style={{ margin: "0 0 2px", fontSize: "13px", color: "#888" }}>トレンド</p>
-                                <p style={{ margin: 0, fontWeight: "bold", fontSize: "15px" }}>{tag}</p>
-                            </div>
-                        ))}
+            {!isMobile && (
+                <div
+                    style={{
+                        width: "320px",
+                        padding: "20px 16px",
+                        position: "sticky",
+                        top: 0,
+                        height: "100vh",
+                        overflowY: "auto",
+                        flexShrink: 0,
+                        borderLeft: "1px solid #333",
+                    }}
+                >
+                    {/* 検索欄 */}
+                    <div style={{ position: "relative", marginBottom: "16px" }}>
+                        <span
+                            style={{
+                                position: "absolute",
+                                left: "14px",
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                fontSize: "16px",
+                            }}
+                        >
+                            <img
+                                src={"/search.svg"}
+                                alt="search"
+                                style={{ width: "16px", height: "16px" }}
+                            />
+                        </span>
+                        <input
+                            placeholder="検索"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={handleSearch}
+                            style={{
+                                width: "100%",
+                                background: "#111",
+                                border: "1px solid #333",
+                                borderRadius: "24px",
+                                padding: "12px 12px 12px 44px",
+                                color: "#fff",
+                                fontSize: "15px",
+                                outline: "none",
+                                boxSizing: "border-box",
+                            }}
+                        />
                     </div>
-                    <button style={{ background: "none", border: "none", color: "#1d9bf0", cursor: "not-allowed", fontSize: "14px", marginTop: "12px", padding: 0 }}>
-                        もっと見る（開発中）
-                    </button>
-                </div>
 
-                {/* おすすめユーザー */}
-                <div style={{ background: "#111", borderRadius: "16px", padding: "16px" }}>
-                    <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
-                    <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>フォロー機能は開発中！</p>
+                    {/* トレンド */}
+                    <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
+                        <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>トレンド</h2>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                            {["#Origo", "#SNS開発", "#Next_js", "#Supabase"].map((tag, i) => (
+                                <div
+                                    key={i}
+                                    onClick={() => handleTagClick(tag)}
+                                    style={{
+                                        borderBottom: i < 3 ? "1px solid #222" : "none",
+                                        paddingBottom: i < 3 ? "12px" : "0",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    <p style={{ margin: "0 0 2px", fontSize: "13px", color: "#888" }}>トレンド</p>
+                                    <p style={{ margin: 0, fontWeight: "bold", fontSize: "15px", color: "#fff" }}>{tag}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* おすすめユーザー */}
+                    <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
+                        <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
+                        <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>フォロー機能は開発中！</p>
+                    </div>
+
+                    <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
+                        Copyright © 2026{" "}
+                        <a
+                            href="https://origo-ochre.vercel.app/profile?user=8mykg"
+                            style={{ color: "#4da6ff", textDecoration: "underline" }}
+                        >
+                            tumayouzi_Dev.
+                        </a>{" "}
+                        All rights reserved.
+                    </p>
                 </div>
-                <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
-                    Copyright © 2026
-                    <a href="https://origo-ochre.vercel.app/profile?user=8mykg" style={{ color: "#4da6ff", textDecoration: "underline" }}>
-                        tumayouzi_Dev.
-                    </a>
-                    All rights reserved.
-                </p>
-            </div>)}
+            )}
 
             {/* 5. 下部バー（共通：スマホ） */}
             {isMobile && (<div style={{

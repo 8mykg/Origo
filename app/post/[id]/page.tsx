@@ -55,7 +55,7 @@ export default function PostDetailPage() {
   const params = useParams()
   const router = useRouter()
   const postId = params?.id as string
-
+  const [targetUrl, setTargetUrl] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [mainPost, setMainPost] = useState<Post | null>(null)
   const [replies, setReplies] = useState<Post[]>([])
@@ -198,6 +198,51 @@ export default function PostDetailPage() {
     fetchPostAndReplies()
   }
 
+  const LinkedText = ({ text, onLinkClick }: { text: string; onLinkClick: (url: string) => void }) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const parts = text.split(urlRegex)
+
+    return (
+      <span>
+        {parts.map((part, i) =>
+          urlRegex.test(part) ? (
+            <span
+              key={i}
+              onClick={(e) => {
+                e.stopPropagation()
+                onLinkClick(part)
+              }}
+              style={{ color: "#1d9bf0", cursor: "pointer", textDecoration: "underline" }}
+              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+            >
+              {part}
+            </span>
+          ) : (
+            part
+          )
+        )}
+      </span>
+    )
+  }
+
+  const handleDelete = async (postId: string, isMainPost = false) => {
+    if (!confirm("本当に削除しますか？")) return
+
+    await supabase.from("likes").delete().eq("post_id", postId)
+    const { error } = await supabase.from("posts").delete().eq("id", postId)
+
+    if (error) {
+      alert("削除できませんでした: " + error.message)
+      return
+    }
+
+    if (isMainPost) {
+      router.push("/") // メインポストを消した場合はTLへ移動
+    } else {
+      fetchPostAndReplies() // 返信を消した場合は再取得
+    }
+  }
+
   const formatDate = (str: string) => {
     const d = new Date(str)
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
@@ -259,8 +304,15 @@ export default function PostDetailPage() {
           </div>
         )}
 
-        <p style={{ fontSize: "18px", lineHeight: "1.5", margin: "12px 0", whiteSpace: "pre-wrap", wordBreak: "break-word", color: "#fff" }}>
-          {mainPost.content}
+        <p style={{
+          margin: "0 0 0px",
+          fontSize: "15px",
+          lineHeight: "1.5",
+          cursor: "pointer",
+          wordBreak: "break-word",
+          whiteSpace: "pre-wrap",
+        }}>
+          <LinkedText text={mainPost.content} onLinkClick={(url) => setTargetUrl(url)} />
         </p>
 
         <div style={{ color: "#888", fontSize: "13px", marginBottom: "12px" }}>
@@ -281,14 +333,11 @@ export default function PostDetailPage() {
               padding: "4px 8px", borderRadius: "20px"
             }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                fill={mainPost.liked ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-            </svg>
+            <img
+              src={mainPost.liked ? "/heart-filled.svg" : "/heart.svg"}
+              alt="like"
+              style={{ width: "16px", height: "16px" }}
+            />
             <span>{mainPost.likes}</span>
           </button>
 
@@ -304,11 +353,37 @@ export default function PostDetailPage() {
               alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "20px"
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
+            <img
+              src={"/comment.svg"}
+              alt="comment"
+              style={{ width: "16px", height: "16px" }}
+            />
             <span>{mainPost.reply_count}</span>
           </button>
+          {/* 自分の投稿なら削除ボタンを表示 */}
+          {mainPost.user_name === currentUser?.user_name && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(mainPost.id, true); // 返信なら isMainPost を false にする
+              }}
+              style={{
+                marginLeft: "auto", background: "none",
+                border: "none", cursor: "pointer",
+                color: "#555", padding: "2px 6px",
+                borderRadius: "4px", fontSize: "13px"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
+              onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -337,20 +412,16 @@ export default function PostDetailPage() {
                   <span style={{ color: "#888", fontSize: "13px" }}>@{reply.user_name}</span>
                   <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(reply.created_at)}</span>
                 </div>
-
-                <p
-                  style={{
-                    margin: "0 0 8px",
-                    fontSize: "15px",
-                    lineHeight: "1.5",
-                    wordBreak: "break-word",
-                    whiteSpace: "pre-wrap",
-                    color: "#eee",
-                  }}
-                >
-                  {reply.content}
+                <p style={{
+                  margin: "0 0 0px",
+                  fontSize: "15px",
+                  lineHeight: "1.5",
+                  cursor: "pointer",
+                  wordBreak: "break-word",
+                  whiteSpace: "pre-wrap",
+                }}>
+                  <LinkedText text={reply.content} onLinkClick={(url) => setTargetUrl(url)} />
                 </p>
-
                 <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
                   {/* 子ポスト用いいね */}
                   <button
@@ -365,14 +436,11 @@ export default function PostDetailPage() {
                       padding: "4px 8px", borderRadius: "20px"
                     }}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                        fill={reply.liked ? "currentColor" : "none"}
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      />
-                    </svg>
+                    <img
+                      src={reply.liked ? "/heart-filled.svg" : "/heart.svg"}
+                      alt="like"
+                      style={{ width: "16px", height: "16px" }}
+                    />
                     <span>{reply.likes}</span>
                   </button>
 
@@ -388,11 +456,38 @@ export default function PostDetailPage() {
                       alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "20px"
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
+                    <img
+                      src={"/comment.svg"}
+                      alt="comment"
+                      style={{ width: "16px", height: "16px" }}
+                    />
                     <span>{reply.reply_count}</span>
                   </button>
+
+                  {/* 自分の投稿なら削除ボタンを表示 */}
+                  {reply.user_name === currentUser?.user_name && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(reply.id, false); // 返信なら isMainPost を false にする
+                      }}
+                      style={{
+                        marginLeft: "auto", background: "none",
+                        border: "none", cursor: "pointer",
+                        color: "#555", padding: "2px 6px",
+                        borderRadius: "4px", fontSize: "13px"
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
+                      onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
