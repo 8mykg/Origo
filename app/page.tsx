@@ -28,6 +28,7 @@ type Post = {
   avatar_url?: string
   reply_to?: string | null
   reply_count?: number
+  reply_to_user?: string | null // ★ これを追加！
 }
 
 type User = {
@@ -79,12 +80,23 @@ export default function Home() {
     if (postsData) {
       const merged = postsData.map((post) => {
         const postUser = usersData?.find((u) => u.user_name === post.user_name)
+
+        // ★ 返信先（親ポスト）がある場合、その親ポストの投稿者ユーザー名を探す
+        let replyToUser = null
+        if (post.reply_to) {
+          const parentPost = postsData.find((p) => p.id === post.reply_to)
+          if (parentPost) {
+            replyToUser = parentPost.user_name
+          }
+        }
+
         return {
           ...post,
           display_name: postUser?.display_name || post.user_name,
           avatar_url: postUser?.avatar_url || null,
           likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
           liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
+          reply_to_user: replyToUser, // ★ 返信先のユーザー名を保持！
         }
       })
       setPosts(merged)
@@ -232,6 +244,13 @@ export default function Home() {
                 <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
                 <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
               </div>
+              
+              {/* ★ ここを追加！ 返信先がある場合のみ表示 */}
+              {post.reply_to_user && (
+                <div style={{ color: "#888", fontSize: "13px", marginBottom: "4px" }}>
+                  返信先: <span style={{ color: "#1d9bf0" }}>@{post.reply_to_user}</span> さん
+                </div>
+              )}
               <p style={{
                 margin: "0 0 0px",
                 fontSize: "15px",
@@ -257,15 +276,11 @@ export default function Home() {
                     alignItems: "center", gap: "6px",
                     padding: "4px 8px", borderRadius: "20px"
                   }}>
-                  {post.liked ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                  )}
+                  <img
+                    src={post.liked ? "/heart-filled.svg" : "/heart.svg"}
+                    alt="like"
+                    style={{ width: "16px", height: "16px" }}
+                  />
                   <span>{post.likes}</span>
                 </button>
                 {/* リプライボタン */}
@@ -281,9 +296,11 @@ export default function Home() {
                     alignItems: "center", gap: "6px",
                     padding: "4px 8px", borderRadius: "20px"
                   }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
+                  <img
+                    src={"/comment.svg"}
+                    alt="comment"
+                    style={{ width: "16px", height: "16px" }}
+                  />
                   {post.reply_count || 0}
                 </button>
                 {/* 自分の投稿だけ削除ボタン表示 */}
