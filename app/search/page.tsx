@@ -3,29 +3,7 @@
 import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { supabase } from "../lib/supabase"
-import Layout, { Reply } from "../components/Layout"
-
-type Post = {
-  id: string
-  user_name: string
-  display_name?: string
-  content: string
-  created_at: string
-  avatar_url?: string
-  reply_to?: string | null
-  reply_count?: number
-  likes?: number
-  liked?: boolean
-  reply_to_user?: string | null
-}
-
-type User = {
-  id: string
-  user_name: string
-  display_name: string
-  avatar_url?: string
-  bio?: string
-}
+import Layout, { Reply, PostItem, Post, User } from "../components/Layout"
 
 // ★ 検索キーワードを太字（ハイライト）にするコンポーネント
 const HighlightedText = ({ text, query }: { text: string; query: string }) => {
@@ -53,7 +31,7 @@ function SearchContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const query = searchParams.get("q") || ""
-
+  const [targetUrl, setTargetUrl] = useState<string | null>(null)
   const [inputQuery, setInputQuery] = useState(query) // ★ 中央の入力バー用
   const [posts, setPosts] = useState<Post[]>([])
   const [matchedUsers, setMatchedUsers] = useState<User[]>([])
@@ -107,6 +85,7 @@ function SearchContent() {
     const { data: likesData } = await supabase.from("likes").select("*")
     const { data: allUsersData } = await supabase.from("users").select("*")
     const { data: allPostsData } = await supabase.from("posts").select("*")
+    const { data: bookmarksData } = await supabase.from("bookmarks").select("*")
 
     if (postsData) {
       const merged = postsData.map((post) => {
@@ -123,6 +102,7 @@ function SearchContent() {
           avatar_url: postUser?.avatar_url || null,
           likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
           liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
+          bookmarked: bookmarksData?.some((b) => b.post_id === post.id && b.user_name === currentUser?.user_name),
           reply_to_user: replyToUser,
         }
       })
@@ -148,9 +128,40 @@ function SearchContent() {
     fetchSearchResults()
   }
 
-  const formatDate = (str: string) => {
-    const d = new Date(str)
-    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
+  const handleBookmark = async (post: Post) => {
+    if (!currentUser) return
+
+    if (post.bookmarked) {
+      // ブックマーク解除
+      await supabase
+        .from("bookmarks")
+        .delete()
+        .eq("post_id", post.id)
+        .eq("user_name", currentUser.user_name)
+    } else {
+      // ブックマーク追加
+      await supabase
+        .from("bookmarks")
+        .insert({ post_id: post.id, user_name: currentUser.user_name })
+    }
+
+    // 再取得（TLや検索の再読込関数を呼ぶ）
+    fetchSearchResults()
+  }
+
+  const handleDelete = async (postId: string) => {
+
+    await supabase.from("likes").delete().eq("post_id", postId)
+
+    const { error } = await supabase.from("posts").delete().eq("id", postId)
+
+    if (error) {
+      console.error("削除失敗:", error.message)
+      alert("削除できませんでした: " + error.message)
+      return
+    }
+
+    fetchSearchResults()
   }
 
   return (
@@ -199,11 +210,6 @@ function SearchContent() {
       {/* 検索ワードがまだ指定されていない場合（/search のみ） */}
       {!query ? (
         <div style={{ padding: "60px 20px", color: "#888", textAlign: "center" }}>
-          <img
-            src={"/search.svg"}
-            alt="search"
-            style={{ width: "16px", height: "16px" }}
-          />
           <p style={{ fontSize: "16px", margin: "0 0 8px", color: "#fff", fontWeight: "bold" }}>キーワードを入力して検索</p>
           <p style={{ fontSize: "14px", margin: 0 }}>ポストのテキストやユーザー名、ハッシュタグを検索できます。</p>
         </div>
@@ -252,45 +258,17 @@ function SearchContent() {
               「{query}」に一致する結果は見つかりませんでした。
             </div>
           ) : (
-            posts.map((post) => (
-              <div
+            posts.map((post: Post) => (
+              <PostItem
                 key={post.id}
-                onClick={() => router.push(`/post/${post.id}`)}
-                style={{ borderBottom: "1px solid #333", cursor: "pointer", padding: "16px 20px", display: "flex", gap: "12px" }}
-              >
-                <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#1d9bf0", overflow: "hidden", flexShrink: 0 }}>
-                  {post.avatar_url && <img src={post.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
-                    <strong style={{ fontSize: "15px", color: "#fff" }}>{post.display_name}</strong>
-                    <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
-                    <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
-                  </div>
-
-                  {post.reply_to_user && (
-                    <div style={{ color: "#888", fontSize: "13px", marginBottom: "4px" }}>
-                      返信先: <span style={{ color: "#1d9bf0" }}>@{post.reply_to_user}</span> さん
-                    </div>
-                  )}
-
-                  <p style={{ margin: "0 0 8px", fontSize: "15px", lineHeight: "1.5", wordBreak: "break-word", whiteSpace: "pre-wrap", color: "#fff" }}>
-                    <HighlightedText text={post.content} query={query} />
-                  </p>
-
-                  <div style={{ display: "flex", gap: "16px" }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleLike(post)
-                      }}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: post.liked ? "#f91880" : "#888", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}
-                    >
-                      <span>❤️ {post.likes}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+                post={post}
+                currentUser={currentUser}
+                onLike={handleLike}
+                onReply={(p: Post) => setReplyingTo(p)}
+                onBookmark={handleBookmark}
+                onDelete={handleDelete}
+                searchQuery={query}
+              />
             ))
           )}
         </>

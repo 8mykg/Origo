@@ -3,53 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabase"
-import Layout, { Reply } from "../../components/Layout"
-
-type Post = {
-  id: string
-  user_name: string
-  display_name?: string
-  content: string
-  created_at: string
-  avatar_url?: string
-  reply_to?: string | null
-  reply_count?: number
-  likes?: number
-  liked?: boolean
-  reply_to_user?: string | null // ★ これを追加！
-}
-
-type User = {
-  id: string
-  user_name: string
-  display_name: string
-  avatar_url?: string
-}
-
-const Avatar = ({ url, name, size = 44 }: { url?: string | null; name: string; size?: number }) => (
-  <div
-    style={{
-      width: size,
-      height: size,
-      borderRadius: "50%",
-      background: url ? "transparent" : "#1d9bf0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontWeight: "bold",
-      fontSize: size * 0.4,
-      color: "#fff",
-      overflow: "hidden",
-      flexShrink: 0,
-    }}
-  >
-    {url ? (
-      <img src={url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={name} />
-    ) : (
-      name[0]?.toUpperCase()
-    )}
-  </div>
-)
+import Layout, { Reply, PostItem, Post, User, LinkedText } from "../../components/Layout"
 
 export default function PostDetailPage() {
   const params = useParams()
@@ -62,7 +16,7 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
 
-  // 1. ユーザーセッションの初期化（Homeと同様）
+  // 1. ユーザーセッションの初期化
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -81,7 +35,7 @@ export default function PostDetailPage() {
         setCurrentUser(userData)
       } else {
         const userName = session.user.user_metadata?.user_name || session.user.email?.split("@")[0] || ""
-        setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName })
+        setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName, bio: null, created_at: "1970-01-01T00:00:00.000Z" })
       }
     }
     init()
@@ -100,10 +54,10 @@ export default function PostDetailPage() {
     setLoading(true)
 
     try {
-      // 共通データの取得
       const { data: likesData } = await supabase.from("likes").select("*")
       const { data: usersData } = await supabase.from("users").select("*")
       const { data: allPostsData } = await supabase.from("posts").select("*")
+      const { data: bookmarksData } = await supabase.from("bookmarks").select("*")
 
       // ① メインポストの取得
       const { data: postData } = await supabase
@@ -116,16 +70,6 @@ export default function PostDetailPage() {
         const postUser = usersData?.find((u) => u.user_name === postData.user_name)
         const replyCount = allPostsData?.filter((p) => p.reply_to === postData.id).length || 0
 
-        setMainPost({
-          ...postData,
-          display_name: postUser?.display_name || postData.user_name,
-          avatar_url: postUser?.avatar_url || null,
-          likes: likesData?.filter((l) => l.post_id === postData.id).length || 0,
-          liked: likesData?.some((l) => l.post_id === postData.id && l.user_name === currentUser.user_name),
-          reply_count: replyCount,
-        })
-
-        // ★ メインポスト自身が返信投稿だった場合の親ユーザー名を取得
         let replyToUser = null
         if (postData.reply_to) {
           const parentPost = allPostsData?.find((p) => p.id === postData.reply_to)
@@ -140,8 +84,9 @@ export default function PostDetailPage() {
           avatar_url: postUser?.avatar_url || null,
           likes: likesData?.filter((l) => l.post_id === postData.id).length || 0,
           liked: likesData?.some((l) => l.post_id === postData.id && l.user_name === currentUser.user_name),
+          bookmarked: bookmarksData?.some((b) => b.post_id === postData.id && b.user_name === currentUser.user_name),
           reply_count: replyCount,
-          reply_to_user: replyToUser, // ★ 追加！
+          reply_to_user: replyToUser,
         })
       } else {
         setMainPost(null)
@@ -165,6 +110,7 @@ export default function PostDetailPage() {
             avatar_url: replyUser?.avatar_url || null,
             likes: likesData?.filter((l) => l.post_id === reply.id).length || 0,
             liked: likesData?.some((l) => l.post_id === reply.id && l.user_name === currentUser.user_name),
+            bookmarked: bookmarksData?.some((b) => b.post_id === reply.id && b.user_name === currentUser.user_name),
             reply_count: subReplyCount,
           }
         })
@@ -179,57 +125,63 @@ export default function PostDetailPage() {
     }
   }
 
-  // 3. いいね処理（Homeと同一のロジック）
+  // いいね処理（Optimistic Update）
   const handleLike = async (post: Post) => {
     if (!currentUser) return
 
-    if (post.liked) {
-      await supabase
-        .from("likes")
-        .delete()
-        .eq("post_id", post.id)
-        .eq("user_name", currentUser.user_name)
+    const isMain = post.id === mainPost?.id
+    const nextLiked = !post.liked
+
+    // post.likes が undefined の場合は 0 として計算するお！
+    const currentLikes = post.likes ?? 0
+    const nextLikes = post.liked ? currentLikes - 1 : currentLikes + 1
+
+    // 1. UIを即座に更新
+    if (isMain && mainPost) {
+      setMainPost({ ...mainPost, liked: nextLiked, likes: nextLikes })
     } else {
-      await supabase
-        .from("likes")
-        .insert({ post_id: post.id, user_name: currentUser.user_name })
+      setReplies((prev) =>
+        prev.map((r) => (r.id === post.id ? { ...r, liked: nextLiked, likes: nextLikes } : r))
+      )
     }
 
-    fetchPostAndReplies()
+    // 2. 裏でSupabaseと通信
+    if (post.liked) {
+      await supabase.from("likes").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
+    } else {
+      await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
+    }
+  }
+  // ブックマーク処理（即座に画面に反映してシームレス化）
+  const handleBookmark = async (post: Post) => {
+    if (!currentUser) return
+
+    const isMain = post.id === mainPost?.id
+    const nextBookmarked = !post.bookmarked
+
+    // 1. UIを即座に更新（待ち時間ゼロにする）
+    if (isMain && mainPost) {
+      setMainPost({ ...mainPost, bookmarked: nextBookmarked })
+    } else {
+      setReplies((prev) =>
+        prev.map((r) => (r.id === post.id ? { ...r, bookmarked: nextBookmarked } : r))
+      )
+    }
+
+    // 2. 裏でSupabaseと通信
+    if (post.bookmarked) {
+      await supabase.from("bookmarks").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
+    } else {
+      await supabase.from("bookmarks").insert({ post_id: post.id, user_name: currentUser.user_name })
+    }
   }
 
-  const LinkedText = ({ text, onLinkClick }: { text: string; onLinkClick: (url: string) => void }) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    const parts = text.split(urlRegex)
-
-    return (
-      <span>
-        {parts.map((part, i) =>
-          urlRegex.test(part) ? (
-            <span
-              key={i}
-              onClick={(e) => {
-                e.stopPropagation()
-                onLinkClick(part)
-              }}
-              style={{ color: "#1d9bf0", cursor: "pointer", textDecoration: "underline" }}
-              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-            >
-              {part}
-            </span>
-          ) : (
-            part
-          )
-        )}
-      </span>
-    )
-  }
-
-  const handleDelete = async (postId: string, isMainPost = false) => {
+  // 削除処理
+  const handleDelete = async (targetPostId: string, isMainPost = false) => {
     if (!confirm("本当に削除しますか？")) return
 
-    await supabase.from("likes").delete().eq("post_id", postId)
-    const { error } = await supabase.from("posts").delete().eq("id", postId)
+    await supabase.from("likes").delete().eq("post_id", targetPostId)
+    const { error } = await supabase.from("posts").delete().eq("id", targetPostId)
 
     if (error) {
       alert("削除できませんでした: " + error.message)
@@ -237,15 +189,15 @@ export default function PostDetailPage() {
     }
 
     if (isMainPost) {
-      router.push("/") // メインポストを消した場合はTLへ移動
+      router.push("/")
     } else {
-      fetchPostAndReplies() // 返信を消した場合は再取得
+      fetchPostAndReplies()
     }
   }
 
   const formatDate = (str: string) => {
     const d = new Date(str)
-    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`
   }
 
   if (loading) {
@@ -274,6 +226,11 @@ export default function PostDetailPage() {
           display: "flex",
           alignItems: "center",
           gap: "16px",
+          position: "sticky",
+          top: 0,
+          background: "rgba(0,0,0,0.8)",
+          backdropFilter: "blur(12px)",
+          zIndex: 10
         }}
       >
         <button
@@ -285,10 +242,32 @@ export default function PostDetailPage() {
         <h1 style={{ fontSize: "18px", fontWeight: "bold", margin: 0 }}>ポスト</h1>
       </div>
 
-      {/* メインポスト */}
+      {/* メインポスト（親ポストだけでかめの独自レイアウト） */}
       <div style={{ padding: "16px", borderBottom: "1px solid #333" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-          <Avatar url={mainPost.avatar_url} name={mainPost.user_name} size={48} />
+          {/* アバター */}
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              background: mainPost.avatar_url ? "transparent" : "#1d9bf0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: "bold",
+              fontSize: 18,
+              color: "#fff",
+              overflow: "hidden",
+              flexShrink: 0,
+            }}
+          >
+            {mainPost.avatar_url ? (
+              <img src={mainPost.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={mainPost.user_name} />
+            ) : (
+              mainPost.user_name[0]?.toUpperCase()
+            )}
+          </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontWeight: "bold", fontSize: "16px", color: "#fff" }}>
               {mainPost.display_name}
@@ -297,7 +276,6 @@ export default function PostDetailPage() {
           </div>
         </div>
 
-        {/* ★ メインポストが返信の場合に「返信先: @ユーザー名」を表示 */}
         {mainPost.reply_to_user && (
           <div style={{ color: "#888", fontSize: "14px", marginBottom: "8px" }}>
             返信先: <span style={{ color: "#1d9bf0" }}>@{mainPost.reply_to_user}</span> さん
@@ -305,27 +283,27 @@ export default function PostDetailPage() {
         )}
 
         <p style={{
-          margin: "0 0 0px",
-          fontSize: "15px",
+          margin: "0 0 12px",
+          fontSize: "18px",
           lineHeight: "1.5",
-          cursor: "pointer",
           wordBreak: "break-word",
           whiteSpace: "pre-wrap",
         }}>
-          <LinkedText text={mainPost.content} onLinkClick={(url) => setTargetUrl(url)} />
+          <LinkedText
+            text={mainPost.content}
+            onLinkClick={(url) => setTargetUrl(url)}
+            query=""
+          />
         </p>
 
-        <div style={{ color: "#888", fontSize: "13px", marginBottom: "12px" }}>
+        <div style={{ color: "#888", fontSize: "14px", marginBottom: "12px" }}>
           {formatDate(mainPost.created_at)}
         </div>
 
         <div style={{ borderTop: "1px solid #222", paddingTop: "12px", display: "flex", gap: "24px", alignItems: "center" }}>
           {/* いいねボタン */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleLike(mainPost)
-            }}
+            onClick={() => handleLike(mainPost)}
             style={{
               background: "none", border: "none", cursor: "pointer",
               color: mainPost.liked ? "#f91880" : "#888",
@@ -333,61 +311,61 @@ export default function PostDetailPage() {
               padding: "4px 8px", borderRadius: "20px"
             }}
           >
-            <img
-              src={mainPost.liked ? "/heart-filled.svg" : "/heart.svg"}
-              alt="like"
-              style={{ width: "16px", height: "16px" }}
-            />
+            <img src={mainPost.liked ? "/heart-filled.svg" : "/heart.svg"} alt="like" style={{ width: "18px", height: "18px" }} />
             <span>{mainPost.likes}</span>
           </button>
 
           {/* 返信ボタン */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setReplyingTo(mainPost)
-            }}
+            onClick={() => setReplyingTo(mainPost)}
             style={{
               background: "none", border: "none", color: "#888",
               cursor: "pointer", fontSize: "14px", display: "flex",
               alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "20px"
             }}
           >
-            <img
-              src={"/comment.svg"}
-              alt="comment"
-              style={{ width: "16px", height: "16px" }}
-            />
+            <img src="/comment.svg" alt="comment" style={{ width: "18px", height: "18px" }} />
             <span>{mainPost.reply_count}</span>
           </button>
-          {/* 自分の投稿なら削除ボタンを表示 */}
+
+          {/* ブックマークボタン */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleBookmark(mainPost)
+            }}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: mainPost.bookmarked ? "#1d9bf0" : "#888",
+              fontSize: "14px", display: "flex", alignItems: "center", gap: "6px",
+              padding: "4px 8px", borderRadius: "20px"
+            }}
+          >
+            {/* アイコンはSVGか文字で表現 */}
+            <img
+              src={mainPost.bookmarked ? "/bookmark-filled.svg" : "/bookmark.svg"}
+              alt="bookmark"
+              style={{ width: "16px", height: "16px" }}
+            />
+            <span>{mainPost.bookmarked ? 1 : 0}</span>
+          </button>
+
+          {/* 削除ボタン */}
           {mainPost.user_name === currentUser?.user_name && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(mainPost.id, true); // 返信なら isMainPost を false にする
-              }}
+              onClick={() => handleDelete(mainPost.id, true)}
               style={{
-                marginLeft: "auto", background: "none",
-                border: "none", cursor: "pointer",
-                color: "#555", padding: "2px 6px",
-                borderRadius: "4px", fontSize: "13px"
+                marginLeft: "auto", background: "none", border: "none", cursor: "pointer",
+                color: "#555", padding: "2px 6px", borderRadius: "4px", fontSize: "13px"
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
-              onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6M14 11v6" />
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-              </svg>
+              削除
             </button>
           )}
         </div>
       </div>
 
-      {/* 返信（リプライ）一覧 */}
+      {/* 返信（リプライ）一覧：ここは PostItem でスッキリ共通化 */}
       <div>
         {replies.length === 0 ? (
           <div style={{ padding: "20px", color: "#888", textAlign: "center", fontSize: "14px" }}>
@@ -395,106 +373,21 @@ export default function PostDetailPage() {
           </div>
         ) : (
           replies.map((reply) => (
-            <div
+            <PostItem
               key={reply.id}
-              style={{
-                padding: "16px 20px",
-                borderBottom: "1px solid #333",
-                display: "flex",
-                gap: "12px",
-              }}
-            >
-              <Avatar url={reply.avatar_url} name={reply.user_name} size={40} />
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
-                  <strong style={{ fontSize: "15px", color: "#fff" }}>{reply.display_name}</strong>
-                  <span style={{ color: "#888", fontSize: "13px" }}>@{reply.user_name}</span>
-                  <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(reply.created_at)}</span>
-                </div>
-                <p style={{
-                  margin: "0 0 0px",
-                  fontSize: "15px",
-                  lineHeight: "1.5",
-                  cursor: "pointer",
-                  wordBreak: "break-word",
-                  whiteSpace: "pre-wrap",
-                }}>
-                  <LinkedText text={reply.content} onLinkClick={(url) => setTargetUrl(url)} />
-                </p>
-                <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                  {/* 子ポスト用いいね */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleLike(reply)
-                    }}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      color: reply.liked ? "#f91880" : "#888",
-                      fontSize: "14px", display: "flex", alignItems: "center", gap: "6px",
-                      padding: "4px 8px", borderRadius: "20px"
-                    }}
-                  >
-                    <img
-                      src={reply.liked ? "/heart-filled.svg" : "/heart.svg"}
-                      alt="like"
-                      style={{ width: "16px", height: "16px" }}
-                    />
-                    <span>{reply.likes}</span>
-                  </button>
-
-                  {/* 子ポスト用リプライ */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setReplyingTo(reply)
-                    }}
-                    style={{
-                      background: "none", border: "none", color: "#888",
-                      cursor: "pointer", fontSize: "14px", display: "flex",
-                      alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "20px"
-                    }}
-                  >
-                    <img
-                      src={"/comment.svg"}
-                      alt="comment"
-                      style={{ width: "16px", height: "16px" }}
-                    />
-                    <span>{reply.reply_count}</span>
-                  </button>
-
-                  {/* 自分の投稿なら削除ボタンを表示 */}
-                  {reply.user_name === currentUser?.user_name && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(reply.id, false); // 返信なら isMainPost を false にする
-                      }}
-                      style={{
-                        marginLeft: "auto", background: "none",
-                        border: "none", cursor: "pointer",
-                        color: "#555", padding: "2px 6px",
-                        borderRadius: "4px", fontSize: "13px"
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
-                      onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                        <path d="M10 11v6M14 11v6" />
-                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+              post={reply}
+              currentUser={currentUser}
+              onLike={handleLike}
+              onReply={(p) => setReplyingTo(p)}
+              onBookmark={handleBookmark}
+              onDelete={(id) => handleDelete(id, false)}
+              onLinkClick={(url) => setTargetUrl(url)}
+            />
           ))
         )}
       </div>
 
+      {/* 返信モーダル */}
       <Reply
         targetPost={replyingTo}
         onClose={() => setReplyingTo(null)}

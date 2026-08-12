@@ -13,30 +13,8 @@ const useIsMobile = () => {
   }, [])
   return isMobile
 }
-import Layout from "./components/Layout"
 import { Reply } from "./components/Layout"
-
-
-type Post = {
-  id: string
-  user_name: string
-  display_name: string
-  content: string
-  created_at: string
-  likes?: number
-  liked?: boolean
-  avatar_url?: string
-  reply_to?: string | null
-  reply_count?: number
-  reply_to_user?: string | null // ★ これを追加！
-}
-
-type User = {
-  id: string
-  user_name: string
-  display_name: string
-  avatar_url?: string
-}
+import Layout, { PostItem, Post, User } from "./components/Layout"
 
 export default function Home() {
   const isMobile = useIsMobile()
@@ -59,9 +37,9 @@ export default function Home() {
       if (!userData) {
         const userName = session.user.user_metadata?.user_name || session.user.email?.split("@")[0]
         await supabase.from("users").insert({
-          id: session.user.id, user_name: userName, display_name: userName,
+          id: session.user.id, user_name: userName, display_name: userName, bio: null, created_at: "1970-01-01T00:00:00.000Z"
         })
-        setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName })
+        setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName, bio: null, created_at: "1970-01-01T00:00:00.000Z" })
       } else {
         setCurrentUser(userData)
       }
@@ -76,6 +54,7 @@ export default function Home() {
     const { data: postsData } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
     const { data: likesData } = await supabase.from("likes").select("*")
     const { data: usersData } = await supabase.from("users").select("*")
+    const { data: bookmarksData } = await supabase.from("bookmarks").select("*")
 
     if (postsData) {
       const merged = postsData.map((post) => {
@@ -96,6 +75,7 @@ export default function Home() {
           avatar_url: postUser?.avatar_url || null,
           likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
           liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
+          bookmarked: bookmarksData?.some((b) => b.post_id === post.id && b.user_name === currentUser?.user_name),
           reply_to_user: replyToUser, // ★ 返信先のユーザー名を保持！
         }
       })
@@ -120,31 +100,25 @@ export default function Home() {
     fetchPosts()
   }
 
-  const LinkedText = ({ text, onLinkClick }: { text: string; onLinkClick: (url: string) => void }) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    const parts = text.split(urlRegex)
+  const handleBookmark = async (post: Post) => {
+    if (!currentUser) return
 
-    return (
-      <span>
-        {parts.map((part, i) =>
-          urlRegex.test(part) ? (
-            <span
-              key={i}
-              onClick={(e) => {
-                e.stopPropagation()
-                onLinkClick(part)
-              }}
-              style={{ color: "#1d9bf0", cursor: "pointer", textDecoration: "underline" }}
-              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-            >
-              {part}
-            </span>
-          ) : (
-            part
-          )
-        )}
-      </span>
-    )
+    if (post.bookmarked) {
+      // ブックマーク解除
+      await supabase
+        .from("bookmarks")
+        .delete()
+        .eq("post_id", post.id)
+        .eq("user_name", currentUser.user_name)
+    } else {
+      // ブックマーク追加
+      await supabase
+        .from("bookmarks")
+        .insert({ post_id: post.id, user_name: currentUser.user_name })
+    }
+
+    // 再取得（TLや検索の再読込関数を呼ぶ）
+    fetchPosts()
   }
 
   const handleDelete = async (postId: string) => {
@@ -160,16 +134,6 @@ export default function Home() {
     }
 
     fetchPosts()
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = "/auth"
-  }
-
-  const formatDate = (str: string) => {
-    const d = new Date(str)
-    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
   }
 
   const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, size?: number }) => (
@@ -232,102 +196,16 @@ export default function Home() {
           </div>
         </div>}
         {posts.map((post) => (
-          <div key={post.id} onClick={() => router.push(`/post/${post.id}`)} style={{ borderBottom: "1px solid #333", cursor: "pointer", padding: "16px 20px", display: "flex", gap: "12px" }}>
-            <button
-              onClick={() => window.location.href = `/profile/${post.user_name}`}
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-              <Avatar url={post.avatar_url} name={post.user_name} />
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
-                <strong style={{ fontSize: "15px" }}>{post.display_name}</strong>
-                <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
-                <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
-              </div>
-              
-              {/* ★ ここを追加！ 返信先がある場合のみ表示 */}
-              {post.reply_to_user && (
-                <div style={{ color: "#888", fontSize: "13px", marginBottom: "4px" }}>
-                  返信先: <span style={{ color: "#1d9bf0" }}>@{post.reply_to_user}</span> さん
-                </div>
-              )}
-              <p style={{
-                margin: "0 0 0px",
-                fontSize: "15px",
-                lineHeight: "1.5",
-                cursor: "pointer",
-                wordBreak: "break-word", // ★これ！これで枠端で強制改行される！
-                whiteSpace: "pre-wrap",  // 💡（おまけ）Enterで手動改行したのもそのまま反映される！
-              }}>
-                <LinkedText text={post.content} onLinkClick={(url) => setTargetUrl(url)} />
-              </p>
-              <div style={{ display: "flex", gap: "16px" }}>
-                {/* いいねボタン */}
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleLike(post);
-                  }}
-                  style={{
-                    background: "none", border: "none",
-                    cursor: "pointer",
-                    color: post.liked ? "#f91880" : "#888",
-                    fontSize: "14px", display: "flex",
-                    alignItems: "center", gap: "6px",
-                    padding: "4px 8px", borderRadius: "20px"
-                  }}>
-                  <img
-                    src={post.liked ? "/heart-filled.svg" : "/heart.svg"}
-                    alt="like"
-                    style={{ width: "16px", height: "16px" }}
-                  />
-                  <span>{post.likes}</span>
-                </button>
-                {/* リプライボタン */}
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    setReplyingTo(post);
-                  }}
-                  style={{
-                    background: "none", border: "none",
-                    cursor: "pointer", color: "#888",
-                    fontSize: "14px", display: "flex",
-                    alignItems: "center", gap: "6px",
-                    padding: "4px 8px", borderRadius: "20px"
-                  }}>
-                  <img
-                    src={"/comment.svg"}
-                    alt="comment"
-                    style={{ width: "16px", height: "16px" }}
-                  />
-                  {post.reply_count || 0}
-                </button>
-                {/* 自分の投稿だけ削除ボタン表示 */}
-                {post.user_name === currentUser?.user_name && (
-                  <button
-                    onClick={() => handleDelete(post.id)}
-                    style={{
-                      marginLeft: "auto", background: "none",
-                      border: "none", cursor: "pointer",
-                      color: "#555", padding: "2px 6px",
-                      borderRadius: "4px", fontSize: "13px"
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = "#f44"}
-                    onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      <path d="M10 11v6M14 11v6" />
-                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                    </svg>
-                  </button>
-
-                )}
-              </div>
-            </div>
-          </div>
+          <PostItem
+            key={post.id}
+            post={post}
+            currentUser={currentUser}
+            onLike={handleLike}
+            onReply={(p) => setReplyingTo(p)}
+            onBookmark={handleBookmark}
+            onDelete={handleDelete}
+            onLinkClick={(url) => setTargetUrl(url)}
+          />
         ))}
       </div>
       <Reply

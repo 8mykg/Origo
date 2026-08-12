@@ -15,24 +15,28 @@ const useIsMobile = () => {
     return isMobile
 }
 
-type Post = {
+export type Post = {
     id: string
     user_name: string
-    display_name: string
+    display_name?: string | null
     content: string
     created_at: string
-    likes?: number
-    liked?: boolean
-    avatar_url?: string
+    avatar_url?: string | null
     reply_to?: string | null
     reply_count?: number
+    likes?: number
+    liked?: boolean
+    bookmarked?: boolean // ★ 追加！
+    reply_to_user?: string | null
 }
 
-type User = {
+export type User = {
     id: string
     user_name: string
     display_name: string
-    avatar_url?: string
+    bio?: string | null
+    avatar_url?: string | null
+    created_at: string
 }
 
 type BarsProps = {
@@ -50,18 +54,25 @@ export type ReplyProps = {
     onSuccess?: () => void
 }
 
-const Avatar = ({ url, name, size = 44 }: { url?: string | null, name: string, size?: number }) => (
-    <div style={{
-        width: size, height: size, borderRadius: "50%",
-        background: url ? "transparent" : "#1d9bf0",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontWeight: "bold", fontSize: size * 0.4, color: "#fff",
-        overflow: "hidden", flexShrink: 0
-    }}>
-        {url
-            ? <img src={url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : name[0]?.toUpperCase()
-        }
+// アバター表示コンポーネント
+export const Avatar = ({ url, name, size = 44 }: { url?: string | null; name: string; size?: number }) => (
+    <div
+        style={{
+            width: size,
+            height: size,
+            borderRadius: "50%",
+            background: url ? "transparent" : "#1d9bf0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: "bold",
+            fontSize: size * 0.4,
+            color: "#fff",
+            overflow: "hidden",
+            flexShrink: 0,
+        }}
+    >
+        {url ? <img src={url} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : name[0]?.toUpperCase()}
     </div>
 )
 
@@ -98,7 +109,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                 await supabase.from("users").insert({
                     id: session.user.id, user_name: userName, display_name: userName,
                 })
-                setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName })
+                setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName, bio: null, created_at: "1970-01-01T00:00:00.000Z" })
             } else {
                 setCurrentUser(userData)
             }
@@ -163,8 +174,11 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                 </svg>
             ),
             label: "ブックマーク",
-            action: () => setActiveTab("bookmarks"),
-            soon: true,
+            action: () => {
+                setActiveTab("bookmarks"),
+                    window.location.href = "/bookmarks"
+            },
+            soon: false,
             maintenance: false
         },
         {
@@ -408,6 +422,285 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                 ))}
             </div>
             )}
+        </div>
+    )
+}
+
+// URL & #ハッシュタグリンク化コンポーネント
+export const LinkedText = ({
+    text,
+    onLinkClick,
+    onTagClick,
+    query,
+}: {
+    text: string
+    onLinkClick?: (url: string) => void
+    onTagClick?: (tag: string) => void
+    query?: string
+}) => {
+    const router = useRouter()
+    // URL、ハッシュタグ、検索クエリの分割用正規表現
+    const regex = /(https?:\/\/[^\s]+|#[a-zA-Z0-9_\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]+)/g
+    const parts = text.split(regex)
+
+    return (
+        <span>
+            {parts.map((part, i) => {
+                if (/^https?:\/\//.test(part)) {
+                    return (
+                        <span
+                            key={i}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (onLinkClick) onLinkClick(part)
+                                else window.open(part, "_blank")
+                            }}
+                            style={{ color: "#1d9bf0", cursor: "pointer", textDecoration: "underline" }}
+                        >
+                            {part}
+                        </span>
+                    )
+                } else if (/^#/.test(part)) {
+                    return (
+                        <span
+                            key={i}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (onTagClick) onTagClick(part)
+                                else router.push(`/search?q=${encodeURIComponent(part)}`)
+                            }}
+                            style={{ color: "#1d9bf0", cursor: "pointer" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                        >
+                            {part}
+                        </span>
+                    )
+                }
+
+                // 検索ワードがある場合は太字（ハイライト）
+                if (query && part.toLowerCase().includes(query.toLowerCase())) {
+                    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                    const subParts = part.split(new RegExp(`(${escapedQuery})`, "gi"))
+                    return (
+                        <span key={i}>
+                            {subParts.map((sub, j) =>
+                                sub.toLowerCase() === query.toLowerCase() ? (
+                                    <strong key={j} style={{ color: "#1d9bf0", fontWeight: "bold" }}>
+                                        {sub}
+                                    </strong>
+                                ) : (
+                                    sub
+                                )
+                            )}
+                        </span>
+                    )
+                }
+
+                return part
+            })}
+        </span>
+    )
+}
+
+// 日付フォーマット
+export const formatDate = (str: string) => {
+    const d = new Date(str)
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`
+}
+
+// ★ 共通ポストカードコンポーネント！
+export function PostItem({
+    post,
+    currentUser,
+    onLike,
+    onReply,
+    onBookmark,
+    onDelete,
+    onLinkClick,
+    searchQuery,
+}: {
+    post: Post
+    currentUser: User | null
+    onLike: (post: Post) => void
+    onReply: (post: Post) => void
+    onBookmark?: (post: Post) => void | Promise<void> // ★ 追加！
+    onDelete?: (postId: string) => void
+    onLinkClick?: (url: string) => void
+    searchQuery?: string
+}) {
+    const router = useRouter()
+
+    return (
+        <div
+            onClick={() => router.push(`/post/${post.id}`)}
+            style={{
+                borderBottom: "1px solid #333",
+                cursor: "pointer",
+                padding: "16px 20px",
+                display: "flex",
+                gap: "12px",
+            }}
+        >
+            <button
+                onClick={(e) => {
+                    e.stopPropagation()
+                    router.push(`/profile/${post.user_name}`)
+                }}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+            >
+                <Avatar url={post.avatar_url} name={post.user_name} />
+            </button>
+
+            <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
+                    <strong style={{ fontSize: "15px", color: "#fff" }}>{post.display_name}</strong>
+                    <span style={{ color: "#888", fontSize: "13px" }}>@{post.user_name}</span>
+                    <span style={{ color: "#888", fontSize: "13px" }}>{formatDate(post.created_at)}</span>
+                </div>
+
+                {/* 返信先表示 */}
+                {post.reply_to_user && (
+                    <div style={{ color: "#888", fontSize: "13px", marginBottom: "4px" }}>
+                        返信先: <span style={{ color: "#1d9bf0" }}>@{post.reply_to_user}</span> さん
+                    </div>
+                )}
+
+                {/* 本文 */}
+                <p
+                    style={{
+                        margin: "0 0 8px",
+                        fontSize: "15px",
+                        lineHeight: "1",
+                        wordBreak: "break-word",
+                        whiteSpace: "pre-wrap",
+                        color: "#fff",
+                    }}
+                >
+                    <LinkedText text={post.content} onLinkClick={onLinkClick} query={searchQuery} />
+                </p>
+
+                {/* アクションボタン（いいね・リプライ・削除） */}
+                <div style={{ display: "flex", gap: "16px" }}>
+                    {/* いいねボタン */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onLike(post)
+                        }}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: post.liked ? "#f91880" : "#888",
+                            fontSize: "14px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 8px",
+                            borderRadius: "20px",
+                        }}
+                    >
+                        <img
+                            src={post.liked ? "/heart-filled.svg" : "/heart.svg"}
+                            alt="like"
+                            style={{ width: "16px", height: "16px" }}
+                        />
+                        <span>{post.likes || 0}</span>
+                    </button>
+
+                    {/* リプライボタン */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onReply(post)
+                        }}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#888",
+                            fontSize: "14px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 8px",
+                            borderRadius: "20px",
+                        }}
+                    >
+                        <img src="/comment.svg" alt="comment" style={{ width: "16px", height: "16px" }} />
+                        <span>{post.reply_count || 0}</span>
+                    </button>
+                    {/* ★ ブックマークボタン */}
+                    {onBookmark && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onBookmark(post)
+                            }}
+                            style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                color: post.bookmarked ? "#1d9bf0" : "#888",
+                                fontSize: "14px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "4px 8px",
+                                borderRadius: "20px",
+                            }}
+                        >
+                            {/* アイコンはSVGか文字で表現 */}
+                            <img
+                                src={post.bookmarked ? "/bookmark-filled.svg" : "/bookmark.svg"}
+                                alt="bookmark"
+                                style={{ width: "16px", height: "16px" }}
+                            />
+                            <span>{post.bookmarked ? 1 : 0}</span>
+                        </button>
+                    )}
+                    {/* 自分の投稿なら削除ボタン */}
+                    {post.user_name === currentUser?.user_name && onDelete && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (confirm("このポストを削除しますか？")) {
+                                    onDelete(post.id)
+                                }
+                            }}
+                            style={{
+                                marginLeft: "auto",
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                color: "#555",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontSize: "13px",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = "#f44")}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = "#555")}
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                <path d="M10 11v6M14 11v6" />
+                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
+            </div>
         </div>
     )
 }
