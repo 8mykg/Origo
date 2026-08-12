@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
 import { useRouter } from "next/navigation"
+import { sendDeviceNotification } from "../lib/notification"
 import React from "react"
 const useIsMobile = () => {
     const [isMobile, setIsMobile] = useState(false)
@@ -54,6 +55,12 @@ export type ReplyProps = {
     onSuccess?: () => void
 }
 
+// トレンドデータの型
+type Trend = {
+    tag: string
+    count: number
+}
+
 // アバター表示コンポーネント
 export const Avatar = ({ url, name, size = 44 }: { url?: string | null; name: string; size?: number }) => (
     <div
@@ -79,6 +86,9 @@ export const Avatar = ({ url, name, size = 44 }: { url?: string | null; name: st
 export default function Layout({ children, Tab }: { children: React.ReactNode; Tab?: string }) {
     const router = useRouter()
     const [searchQuery, setSearchQuery] = useState("")
+    // 〜〜 コンポーネント内の処理 〜〜
+    const [allPostsData, setAllPostsData] = useState<Post[]>([])
+    const [trends, setTrends] = useState<Trend[]>([])
 
     // 検索実行（Enterキー）
     const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -116,6 +126,55 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
         }
         init()
     }, [])
+
+    useEffect(() => {
+        const fetchAllPosts = async () => {
+            const { data, error } = await supabase
+                .from("posts")
+                .select("id, content") // タグ集計に必要なものだけ取得
+
+            if (error) {
+                console.error("投稿データの取得に失敗しました:", error)
+                return
+            }
+
+            if (data) {
+                setAllPostsData(data as Post[])
+            }
+        }
+
+        fetchAllPosts()
+    }, [])
+
+    // ★ 4. トレンドの集計処理（エラー修正済み）
+    useEffect(() => {
+        if (!allPostsData || allPostsData.length === 0) return
+
+        // ハッシュタグ検出用正規表現
+        const hashtagRegex = /#[a-zA-Z0-9_\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]+/g
+        const tagCounts: Record<string, number> = {} // Record型でインデックスエラーを回避
+
+        // 全投稿の本文からハッシュタグを抽出＆カウント
+        allPostsData.forEach((post: Post) => { // 型を明示
+            if (!post.content) return
+            const matches = post.content.match(hashtagRegex)
+            if (matches) {
+                // 1つの投稿で同じタグが複数あっても1回とカウント
+                const uniqueTags = Array.from(new Set(matches))
+                uniqueTags.forEach((tag) => {
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1
+                })
+            }
+        })
+
+        // 件数が多い順にソートして上位4件を取得
+        const sortedTrends: Trend[] = Object.entries(tagCounts)
+            .map(([tag, count]) => ({ tag, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 4)
+
+        setTrends(sortedTrends)
+    }, [allPostsData])
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
@@ -162,8 +221,11 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                 </svg>
             ),
             label: "通知",
-            action: () => setActiveTab("notifications"),
-            soon: true,
+            action: () => {
+                setActiveTab("notifications"),
+                window.location.href = "/notifications"
+            },
+            soon: false,
             maintenance: false
         },
         {
@@ -360,28 +422,38 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     {/* トレンド */}
                     <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
                         <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>トレンド</h2>
+
                         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                            {["#Origo", "#SNS開発", "#Next_js", "#Supabase"].map((tag, i) => (
-                                <div
-                                    key={i}
-                                    onClick={() => handleTagClick(tag)}
-                                    style={{
-                                        borderBottom: i < 3 ? "1px solid #222" : "none",
-                                        paddingBottom: i < 3 ? "12px" : "0",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    <p style={{ margin: "0 0 2px", fontSize: "13px", color: "#888" }}>トレンド</p>
-                                    <p style={{ margin: 0, fontWeight: "bold", fontSize: "15px", color: "#fff" }}>{tag}</p>
-                                </div>
-                            ))}
+                            {trends.length === 0 ? (
+                                <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>トレンドはありません</p>
+                            ) : (
+                                trends.map((item, i) => (
+                                    <div
+                                        key={item.tag}
+                                        onClick={() => handleTagClick(item.tag)}
+                                        style={{
+                                            borderBottom: i < trends.length - 1 ? "1px solid #222" : "none",
+                                            paddingBottom: i < trends.length - 1 ? "12px" : "0",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <p style={{ margin: "0 0 2px", fontSize: "13px", color: "#888" }}>日本のトレンド</p>
+                                        <p style={{ margin: "0 0 2px", fontWeight: "bold", fontSize: "15px", color: "#fff" }}>
+                                            {item.tag}
+                                        </p>
+                                        <p style={{ margin: 0, fontSize: "12px", color: "#666" }}>
+                                            {item.count}件のポスト
+                                        </p>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
 
                     {/* おすすめユーザー */}
                     <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
                         <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
-                        <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>フォロー機能は開発中！</p>
+                        <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>開発中！</p>
                     </div>
 
                     <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
@@ -751,6 +823,14 @@ export function Reply({ targetPost, onClose, onSuccess }: ReplyProps) {
 
             setReplyInput("")
             onClose()
+            if (targetPost && targetPost.user_name !== userData.user_name) {
+                await supabase.from("notifications").insert({
+                    user_name: targetPost.user_name,     // 返信された人
+                    actor_name: userData.user_name,  // 返信した人
+                    type: "reply",
+                    post_id: targetPost.id,
+                })
+            }
             if (onSuccess) onSuccess()
         }
         setSubmitting(false)

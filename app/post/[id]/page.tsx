@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabase"
+import { sendDeviceNotification } from "../../lib/notification"
 import Layout, { Reply, PostItem, Post, User, LinkedText } from "../../components/Layout"
 
 export default function PostDetailPage() {
@@ -150,6 +151,21 @@ export default function PostDetailPage() {
       await supabase.from("likes").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
     } else {
       await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
+    }
+
+    if (post.user_name !== currentUser.user_name) {
+      // ① DBに通知保存
+      await supabase.from("notifications").insert({
+        user_name: post.user_name,
+        actor_name: currentUser.user_name,
+        type: "like",
+        post_id: post.id,
+      })
+
+      // ② 実デバイス通知を飛ばす（相手の端末で許可されていれば届きます）
+      sendDeviceNotification("新しいいいね！", {
+        body: `@${currentUser.user_name} さんがあなたのポストに「いいね」しました`,
+      })
     }
   }
   // ブックマーク処理（即座に画面に反映してシームレス化）
