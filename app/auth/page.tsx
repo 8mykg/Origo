@@ -2,15 +2,11 @@
 export const dynamic = "force-dynamic"
 import { useState } from "react"
 import { supabase } from "../lib/supabase"
+import { verifyInvitationCode } from "../lib/invitation"
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
   const [Invitationcode, setInvitationcode] = useState("")
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, "0")
-  const day = String(today.getDate()).padStart(2, "0")
-  const SECRET_INVITATION_CODE = `Origo.tumayouzi${year}-${month}-${day}野獣先輩`
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -49,12 +45,13 @@ export default function AuthPage() {
     } else {
 
       if (!Invitationcode.trim()) {
-        setError("招待コードを入力してください(開発者に聞け)")
+        setError("招待コードを入力してください(開発者に聞いてください)")
         setLoading(false)
         return
       }
 
-      if (Invitationcode.trim() !== SECRET_INVITATION_CODE) {
+      const isValidCode = await verifyInvitationCode(Invitationcode)
+      if (!isValidCode) {
         setError("招待コードが正しくありません、または期限切れです")
         setLoading(false)
         return

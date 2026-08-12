@@ -38,6 +38,7 @@ export type User = {
     bio?: string | null
     avatar_url?: string | null
     created_at: string
+    role: string
 }
 
 type BarsProps = {
@@ -119,7 +120,10 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                 await supabase.from("users").insert({
                     id: session.user.id, user_name: userName, display_name: userName,
                 })
-                setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName, bio: null, created_at: "1970-01-01T00:00:00.000Z" })
+                setCurrentUser({
+                    id: session.user.id, user_name: userName, display_name: userName,
+                    bio: null, created_at: "1970-01-01T00:00:00.000Z", role: "user"
+                })
             } else {
                 setCurrentUser(userData)
             }
@@ -223,7 +227,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
             label: "通知",
             action: () => {
                 setActiveTab("notifications"),
-                window.location.href = "/notifications"
+                    window.location.href = "/notifications"
             },
             soon: false,
             maintenance: false

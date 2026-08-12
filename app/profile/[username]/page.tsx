@@ -463,10 +463,29 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                         </div>
                     ) : (
                         <div>
-                            <p style={{ margin: "0 0 4px", fontWeight: "bold", fontSize: "18px" }}>
-                                {profileUser?.display_name || userName}
-                            </p>
-                            <p style={{ margin: "0 0 8px", color: "#888", fontSize: "14px" }}>@{userName}</p>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ fontWeight: "bold", fontSize: "16px", color: "#fff" }}>
+                                    {profileUser?.display_name}
+                                </span>
+                                {/* ★ 運営者タグ / ADMINバッジ */}
+                                {profileUser?.role === "admin" && (
+                                    <span
+                                        style={{
+                                            background: "linear-gradient(135deg, #1d9bf0, #7928ca)",
+                                            color: "#fff",
+                                            fontSize: "11px",
+                                            fontWeight: "bold",
+                                            padding: "2px 8px",
+                                            borderRadius: "12px",
+                                            letterSpacing: "0.5px",
+                                            boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+                                        }}
+                                    >
+                                        公式運営
+                                    </span>
+                                )}
+                            </div>
+                            <span style={{ color: "#666", fontSize: "14px" }}>@{profileUser?.user_name}</span>
                             {profileUser?.bio && <p style={{ margin: "0 0 12px", fontSize: "15px" }}>{profileUser.bio}</p>}
 
                             {/* フォロー数 */}

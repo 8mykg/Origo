@@ -36,7 +36,9 @@ export default function PostDetailPage() {
         setCurrentUser(userData)
       } else {
         const userName = session.user.user_metadata?.user_name || session.user.email?.split("@")[0] || ""
-        setCurrentUser({ id: session.user.id, user_name: userName, display_name: userName, bio: null, created_at: "1970-01-01T00:00:00.000Z" })
+        setCurrentUser({
+          id: session.user.id, user_name: userName, display_name: userName, 
+          bio: null, created_at: "1970-01-01T00:00:00.000Z", role: "user" })
       }
     }
     init()
