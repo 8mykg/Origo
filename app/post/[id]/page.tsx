@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabase"
+import { PostSkeletonList } from "../../components/CSSTransformation"
 import { sendDeviceNotification } from "../../lib/notification"
 import Layout, { Reply, PostItem, Post, User, LinkedText } from "../../components/Layout"
 
@@ -37,8 +38,9 @@ export default function PostDetailPage() {
       } else {
         const userName = session.user.user_metadata?.user_name || session.user.email?.split("@")[0] || ""
         setCurrentUser({
-          id: session.user.id, user_name: userName, display_name: userName, 
-          bio: null, created_at: "1970-01-01T00:00:00.000Z", role: "user" })
+          id: session.user.id, user_name: userName, display_name: userName,
+          bio: null, created_at: "1970-01-01T00:00:00.000Z", role: "user"
+        })
       }
     }
     init()
@@ -221,7 +223,7 @@ export default function PostDetailPage() {
   if (loading) {
     return (
       <Layout Tab="home">
-        <div style={{ padding: "20px", color: "#888", textAlign: "center" }}>読み込み中...</div>
+        <PostSkeletonList />
       </Layout>
     )
   }

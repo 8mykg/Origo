@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic"
 import { useState, useEffect } from "react"
 import { supabase } from "./lib/supabase"
 import { useRouter } from "next/navigation"
+import { PostSkeletonList } from "./components/CSSTransformation"
 import { sendDeviceNotification } from "./lib/notification"
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false)
@@ -169,9 +170,11 @@ export default function Home() {
   )
 
   if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "sans-serif" }}>
-      <p>読み込み中...</p>
-    </div>
+    <Layout
+      Tab="home"
+    >
+      <PostSkeletonList/>
+    </Layout>
   )
 
   return (

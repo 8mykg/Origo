@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react"
 import { supabase } from "../../lib/supabase"
 import { useRouter } from "next/navigation"
+import { PostSkeleton } from "../../components/CSSTransformation"
 import { sendDeviceNotification } from "../../lib/notification"
 import Layout, { Reply, PostItem, Post, User } from "../../components/Layout"
 // ----------------------------------------------------
@@ -316,9 +317,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     }
 
     if (loading) return (
-        <div style={{ minHeight: "100vh", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "sans-serif" }}>
-            <p>読み込み中...</p>
-        </div>
+        <>
+            <PostSkeleton/>
+        </>
     )
 
     return (
@@ -470,6 +471,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                 {/* ★ 運営者タグ / ADMINバッジ */}
                                 {profileUser?.role === "admin" && (
                                     <span
+                                        className="badge-shine" /* ★ ここに追加！ */
                                         style={{
                                             background: "linear-gradient(135deg, #1d9bf0, #7928ca)",
                                             color: "#fff",
@@ -479,6 +481,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                             borderRadius: "12px",
                                             letterSpacing: "0.5px",
                                             boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+                                            display: "inline-block", /* アニメーション位置維持のため */
                                         }}
                                     >
                                         公式運営

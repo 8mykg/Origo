@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
+import { PostSkeletonList } from "../components/CSSTransformation"
 import Layout, { Reply, PostItem, Post, User } from "../components/Layout"
 
 export default function BookmarksPage() {
@@ -91,7 +92,7 @@ export default function BookmarksPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: "20px", color: "#888", textAlign: "center" }}>読み込み中...</div>
+          <PostSkeletonList />
       ) : posts.length === 0 ? (
         <div style={{ padding: "60px 20px", color: "#888", textAlign: "center" }}>
           <p style={{ fontSize: "16px", color: "#fff", fontWeight: "bold" }}>まだブックマークがありません</p>

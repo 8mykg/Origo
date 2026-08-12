@@ -5,13 +5,6 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -23,4 +16,227 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ==============================================
+   1. 運営者バッジのキラッと光るアニメーション
+   ============================================== */
+@keyframes shine {
+  0% {
+    left: -100%;
+  }
+
+  20% {
+    left: 200%;
+    /* 瞬時に光が走り抜ける */
+  }
+
+  100% {
+    left: 200%;
+    /* しばらく光らない時間を作る（ループ調整） */
+  }
+}
+
+.badge-shine {
+  position: relative;
+  overflow: hidden;
+  /* はみ出た光を隠す */
+}
+
+.badge-shine::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 50%;
+  height: 200%;
+  /* 斜めの白いグラデーション光 */
+  background: linear-gradient(60deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.7) 50%,
+      transparent 100%);
+  transform: rotate(25deg);
+  /* 3秒周期で光らせる */
+  animation: shine 3s infinite ease-in-out;
+}
+
+/* 画面中央に要素を完全固定するコンテナ */
+.loading-full-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.85);
+  /* ほんのり背景を暗くして高級感を演出 */
+  backdrop-filter: blur(8px);
+  /* 背景をふわっとぼかす */
+  z-index: 9999;
+  /* 他の要素より一番前に出す */
+}
+
+/* ==============================================
+   Origo ロゴローディング用アニメーション
+   ============================================== */
+@keyframes origo-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes origo-spin-pulse {
+  0% {
+    transform: rotate(0deg) scale(0.96);
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1.04);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(0.96);
+  }
+}
+
+/* メインの「O」：強弱をつけながらスムーズに回転 */
+.origo-spin-main {
+  animation: origo-spin-pulse 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* 外側のリング：反時計回り */
+.origo-spin-reverse {
+  animation: origo-spin 6s linear infinite reverse;
+}
+
+/* 内側のリング：反時計回りに少し速め */
+.origo-spin-inner {
+  animation: origo-spin 2.5s linear infinite reverse;
+}
+
+/* ==============================================
+   2. クールなローディング（スケルトン）
+   ============================================== */
+
+/* スケルトンUI用パルスアニメーション */
+@keyframes skeleton-pulse {
+
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.skeleton {
+  background: #222;
+  border-radius: 8px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ==============================================
+   投稿カード用：中身は100%真っ黒、外側だけ上品に発光
+   ============================================== */
+.glow-card {
+  background-color: #0d0d0d !important; /* 絶対に透けない漆黒 */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  
+  /* ぼかし光と動きのスムーズな変化 */
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+/* ホバー（フォーカス）した時：box-shadow で外側だけに光を放射する */
+.glow-card:hover,
+.glow-card:focus-within {
+  /* 1. 枠線をうっすら青く */
+  border-color: rgba(29, 155, 240, 0.5); 
+  
+  /* 2. 外側だけにぼかし光を照射（内側には絶対に光が入らない！） */
+  /* [横方向] [縦方向] [ぼかし半径] [広がり] [色] */
+  box-shadow: 
+    0 0 16px rgba(29, 155, 240, 0.35),  /* 青の近距離バックライト */
+    0 0 32px rgba(121, 40, 202, 0.25); /* 紫の広範囲バックライト */
+    
+  /* 3. ほんのり上に浮く */
+  transform: translateY(-2px); 
+}
+
+/* ==============================================
+   2. タブ切り替え時の白いインジケーター（上下移動・スライド）
+   ============================================== */
+/* タブの親要素 */
+.tab-container {
+  position: relative;
+  display: flex;
+  background: #111;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid #222;
+}
+
+/* ヌルッと動く白のフォーカス背景 */
+.tab-indicator {
+  position: absolute;
+  background: #ffffff;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  /* スムーズなスライド */
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.2);
+}
+
+/* ナビゲーション全体の親要素 */
+.nav-tab-vertical-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 上下に滑らかに動く白バー */
+.nav-tab-indicator-vertical {
+  position: absolute;
+  left: 0;
+  width: 6px;
+  height: 24px;
+  background: #ffffff;
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
+
+  /* 重なり順を上にして背景に隠れないようにする */
+  z-index: 2;
+  pointer-events: none;
+
+  /* 上下移動(Y)と、左移動(X)をスムーズにする */
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), margin-left 0.3s ease;
+}
+
+/* ★ 「アクティブなタブボタン(active-tab-item)」にマウスが乗った時だけ、白バーを左へ逃がす */
+.nav-tab-vertical-container:has(.active-tab-item:hover) .nav-tab-indicator-vertical {
+  margin-left: -4px;
+}
+
+/* ==============================================
+   3. ポチッと心地よいボタンアニメーション
+   ============================================== */
+.btn-bounce {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
+}
+
+.btn-bounce:hover {
+  transform: scale(1.03);
+}
+
+.btn-bounce:active {
+  transform: scale(0.95);
+  /* クリックした瞬間に少し凹む */
 }

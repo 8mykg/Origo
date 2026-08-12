@@ -1,8 +1,8 @@
 "use client"
-
 import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { supabase } from "../lib/supabase"
+import { PostSkeletonList } from "../components/CSSTransformation"
 import { sendDeviceNotification } from "../lib/notification"
 import Layout, { Reply, PostItem, Post, User } from "../components/Layout"
 
@@ -296,7 +296,13 @@ function SearchContent() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div style={{ padding: "20px", color: "#888" }}>読み込み中...</div>}>
+    <Suspense fallback={<div style={{ padding: "20px", color: "#888" }}>
+      <Layout
+        Tab="search"
+      >
+        <PostSkeletonList />
+      </Layout>
+    </div>}>
       <SearchContent />
     </Suspense>
   )

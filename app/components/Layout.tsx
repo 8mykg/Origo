@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
 import { useRouter } from "next/navigation"
-import { sendDeviceNotification } from "../lib/notification"
 import React from "react"
 const useIsMobile = () => {
     const [isMobile, setIsMobile] = useState(false)
@@ -90,6 +89,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
     // 〜〜 コンポーネント内の処理 〜〜
     const [allPostsData, setAllPostsData] = useState<Post[]>([])
     const [trends, setTrends] = useState<Trend[]>([])
+    const [activeIdx, setActiveIdx] = useState(0)
 
     // 検索実行（Enterキー）
     const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -201,7 +201,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
             },
         },
         {
-            id: "settings",
+            id: "search",
             icon: (
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="10" cy="10" r="7.5"></circle>
@@ -281,7 +281,8 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
             maintenance: false
         },
     ]
-
+    const activeIndex = navItems.findIndex((item) => item.id === activeTab)
+    const BUTTON_HEIGHT = 52 // ボタンの高さ40px + gap 8px など
     return (
         <div style={{ minHeight: "100vh", background: "#000", fontFamily: "sans-serif", color: "#fff", display: "flex", justifyContent: "space-between" }}>
             {/* 2. 左サイドバー（共通：PC） */}
@@ -297,37 +298,53 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
                 </div>
                 {/* ナビ */}
-                <nav style={{ flex: 1 }}>
-                    {navItems.map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={item.action}
+                <nav className="nav-tab-vertical-container" style={{ flex: 1, position: "relative", display: "flex", flexDirection: "column", gap: "0px", width: "250px" }}>
+                    {/* ★ 上下に移動する白いバー */}
+                    {activeIndex !== -1 && (
+                        <div
+                            className="nav-tab-indicator-vertical"
                             style={{
-                                width: "100%", display: "flex", alignItems: "center", gap: "16px",
-                                background: activeTab === item.id ? "#111" : "none",
-                                border: "none", borderRadius: "12px",
-                                padding: "12px 16px", cursor: "pointer",
-                                color: activeTab === item.id ? "#fff" : "#aaa",
-                                fontSize: "16px", marginBottom: "4px",
-                                textAlign: "left"
-                            }}>
-                            <span style={{ fontSize: "20px" }}>{item.icon}</span>
-                            <span style={{ fontWeight: activeTab === item.id ? "bold" : "normal" }}>
-                                {item.label}
-                            </span>
-                            {item.soon && (
-                                <span style={{
-                                    marginLeft: "auto", fontSize: "10px",
-                                    background: "#1d9bf020", color: "#1d9bf0",
-                                    padding: "2px 8px", borderRadius: "10px",
-                                    border: "1px solid #1d9bf040"
-                                }}>
-                                    {item.maintenance ? "メンテ中" : "開発中"}
-                                </span>
-                            )}
-                        </button>
-                    ))}
+                                // インデックス × 高さ分だけ下にスライド！
+                                transform: `translateY(${activeIndex * BUTTON_HEIGHT + 12}px)`,
+                            }}
+                        />
+                    )}
+                    {/* 2. 各タブボタン */}
+                    {navItems.map((item) => {
+                        const isActive = activeTab === item.id;
 
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={item.action}
+                                /* ★ アクティブな時だけ active-tab-item クラスを付与 */
+                                className={`btn-bounce ${isActive ? "active-tab-item" : ""}`}
+                                style={{
+                                    width: "100%", display: "flex", alignItems: "center", gap: "16px",
+                                    background: isActive ? "#111" : "none",
+                                    border: "none", borderRadius: "12px",
+                                    padding: "12px 16px", cursor: "pointer",
+                                    color: isActive ? "#fff" : "#aaa",
+                                    fontSize: "16px", marginBottom: "4px",
+                                    textAlign: "left"
+                                }}>
+                                <span style={{ fontSize: "20px" }}>{item.icon}</span>
+                                <span style={{ fontWeight: isActive ? "bold" : "normal" }}>
+                                    {item.label}
+                                </span>
+                                {item.soon && (
+                                    <span style={{
+                                        marginLeft: "auto", fontSize: "10px",
+                                        background: "#1d9bf020", color: "#1d9bf0",
+                                        padding: "2px 8px", borderRadius: "10px",
+                                        border: "1px solid #1d9bf040"
+                                    }}>
+                                        {item.maintenance ? "メンテ中" : "開発中"}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                     {/* 投稿ボタン */}
                     <button
                         onClick={() => setActiveTab("home")}
@@ -609,13 +626,14 @@ export function PostItem({
 
     return (
         <div
+            className="glow-card"
             onClick={() => router.push(`/post/${post.id}`)}
             style={{
-                borderBottom: "1px solid #333",
                 cursor: "pointer",
                 padding: "16px 20px",
                 display: "flex",
                 gap: "12px",
+                marginBottom: "3px", /* カード同士の間隔を開ける場合 */
             }}
         >
             <button
