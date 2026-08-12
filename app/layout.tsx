@@ -6,30 +6,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja">
       <head>
         {/* iPhoneホーム画面追加時のアイコン指定 */}
-        <link rel="apple-touch-icon" href="/logo-icon192.png" />
+        <link rel="apple-touch-icon" href="../public/logo-icon-192.png" />
       </head>
       <body>{children}</body>
     </html>
   )
 }
 
-  // Viewport の設定（テーマカラーや拡大禁止など）
-  export const viewport: Viewport = {
-    themeColor: "#000000",
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1, // スマホアプリ感を出すためにダブルタップ拡大などを防ぐ
-    userScalable: false,
-  }
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
 
-  // PWA用のメタデータ
-  export const metadata: Metadata = {
+export const metadata: Metadata = {
+  title: "Origo",
+  description: "Origo Social Network",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico?v=3" },
+      { url: "/logo-icon-192.png?v=3", type: "image/png", sizes: "192x192" }
+    ],
+    shortcut: "/favicon.ico?v=3",
+    apple: "/logo-icon-180.png?v=3", // iPhone用
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
     title: "Origo",
-    description: "Origo Social Network",
-    manifest: "/manifest.json",
-    appleWebApp: {
-      capable: true,
-      statusBarStyle: "black-translucent",
-      title: "Origo",
-    },
-  }
+  },
+}
