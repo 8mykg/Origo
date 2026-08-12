@@ -6,7 +6,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja">
       <head>
         {/* iPhoneホーム画面追加時のアイコン指定 */}
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/logo-icon192.png" />
       </head>
       <body>{children}</body>
     </html>
