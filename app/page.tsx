@@ -42,8 +42,9 @@ export default function Home() {
           id: session.user.id, user_name: userName, display_name: userName, bio: null, created_at: "1970-01-01T00:00:00.000Z"
         })
         setCurrentUser({
-          id: session.user.id, user_name: userName, display_name: userName, 
-          bio: null, created_at: "1970-01-01T00:00:00.000Z", role: "user" })
+          id: session.user.id, user_name: userName, display_name: userName,
+          bio: null, created_at: "1970-01-01T00:00:00.000Z", role: "user"
+        })
       } else {
         setCurrentUser(userData)
       }
@@ -55,36 +56,56 @@ export default function Home() {
   useEffect(() => { if (currentUser) fetchPosts() }, [currentUser])
 
   const fetchPosts = async () => {
-    const { data: postsData } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
+    // 1. まず「TL同期フラグ(show_in_tl = true)」がオンになっている部屋のID一覧を取得
+    const { data: allowedRooms } = await supabase
+      .from("rooms")
+      .select("id")
+      .eq("show_in_tl", true)
+
+    const allowedRoomIds = allowedRooms?.map((r: { id: string }) => r.id) || []
+
+    // 2. 「通常のTL投稿 (room_id が null)」を取得
+    const { data: normalPosts } = await supabase
+      .from("posts")
+      .select("*")
+      .is("room_id", null)
+
+    // 3. 「TL同期が許可された部屋の投稿」を取得
+    let roomPosts: any[] = []
+    if (allowedRoomIds.length > 0) {
+      const { data: fetchedRoomPosts } = await supabase
+        .from("posts")
+        .select("*")
+        .in("room_id", allowedRoomIds) // 許可された部屋のIDのみ指定
+
+      if (fetchedRoomPosts) {
+        roomPosts = fetchedRoomPosts
+      }
+    }
+
+    // 4. 両方の投稿を合体させて、作成日時（created_at）の新しい順に並び替え
+    const allPosts = [...(normalPosts || []), ...roomPosts].sort((a, b) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+
+    // 5. イイネやユーザー情報の紐付け処理（既存の処理）
     const { data: likesData } = await supabase.from("likes").select("*")
     const { data: usersData } = await supabase.from("users").select("*")
     const { data: bookmarksData } = await supabase.from("bookmarks").select("*")
 
-    if (postsData) {
-      const merged = postsData.map((post) => {
-        const postUser = usersData?.find((u) => u.user_name === post.user_name)
+    const merged = allPosts.map((post) => {
+      const postUser = usersData?.find((u) => u.user_name === post.user_name)
+      return {
+        ...post,
+        display_name: postUser?.display_name || post.user_name,
+        avatar_url: postUser?.avatar_url || null,
+        likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
+        liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
+        bookmarked: bookmarksData?.some((b) => b.post_id === post.id && b.user_name === currentUser?.user_name),
+      }
+    })
 
-        // ★ 返信先（親ポスト）がある場合、その親ポストの投稿者ユーザー名を探す
-        let replyToUser = null
-        if (post.reply_to) {
-          const parentPost = postsData.find((p) => p.id === post.reply_to)
-          if (parentPost) {
-            replyToUser = parentPost.user_name
-          }
-        }
-
-        return {
-          ...post,
-          display_name: postUser?.display_name || post.user_name,
-          avatar_url: postUser?.avatar_url || null,
-          likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
-          liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
-          bookmarked: bookmarksData?.some((b) => b.post_id === post.id && b.user_name === currentUser?.user_name),
-          reply_to_user: replyToUser, // ★ 返信先のユーザー名を保持！
-        }
-      })
-      setPosts(merged)
-    }
+    setPosts(merged)
   }
 
   const handlePost = async () => {
@@ -173,7 +194,7 @@ export default function Home() {
     <Layout
       Tab="home"
     >
-      <PostSkeletonList/>
+      <PostSkeletonList />
     </Layout>
   )
 
@@ -181,8 +202,8 @@ export default function Home() {
     <Layout
       Tab="home"
     >
-      < div style={{ padding: "16px" }}>
-        {<div style={{ borderBottom: "1px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
+      < div style={{ padding: "0px" }}>
+        {<div style={{ borderBottom: "2px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
           <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} />
           <div style={{ flex: 1 }}>
             <textarea

@@ -201,6 +201,25 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
             },
         },
         {
+            id: "rooms",
+            icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 3v18"></path>
+                    <path d="M19 21V3H9"></path>
+                    <path d="M5 3l10 2v14L5 21z"></path>
+                    <circle cx="12" cy="12" r="1"></circle>
+                </svg>
+
+            ),
+            label: "部屋",
+            action: () => {
+                setActiveTab("rooms")
+                window.location.href = "/rooms"
+            },
+            soon: true,
+            beta: true
+        },
+        {
             id: "search",
             icon: (
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -214,7 +233,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     window.location.href = "/search"
             },
             soon: false,
-            maintenance: false
+            beta: false
         },
         {
             id: "notifications",
@@ -230,7 +249,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     window.location.href = "/notifications"
             },
             soon: false,
-            maintenance: false
+            beta: false
         },
         {
             id: "bookmarks",
@@ -245,7 +264,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     window.location.href = "/bookmarks"
             },
             soon: false,
-            maintenance: false
+            beta: false
         },
         {
             id: "profile",
@@ -265,7 +284,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                 }
             },
             soon: false,
-            maintenance: false
+            beta: false
         },
         {
             id: "settings",
@@ -278,7 +297,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
             label: "設定",
             action: () => setActiveTab("settings"),
             soon: true,
-            maintenance: false
+            beta: false
         },
     ]
     const activeIndex = navItems.findIndex((item) => item.id === activeTab)
@@ -312,7 +331,6 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     {/* 2. 各タブボタン */}
                     {navItems.map((item) => {
                         const isActive = activeTab === item.id;
-
                         return (
                             <button
                                 key={item.id}
@@ -339,24 +357,12 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                                         padding: "2px 8px", borderRadius: "10px",
                                         border: "1px solid #1d9bf040"
                                     }}>
-                                        {item.maintenance ? "メンテ中" : "開発中"}
+                                        {item.beta ? "β版" : "開発中"}
                                     </span>
                                 )}
                             </button>
                         );
                     })}
-                    {/* 投稿ボタン */}
-                    <button
-                        onClick={() => setActiveTab("home")}
-                        style={{
-                            width: "100%", background: "#1d9bf0",
-                            border: "none", borderRadius: "24px",
-                            padding: "14px", color: "#fff",
-                            fontWeight: "bold", fontSize: "16px",
-                            cursor: "pointer", marginTop: "16px"
-                        }}>
-                        投稿する
-                    </button>
                 </nav>
 
                 {/* ユーザー情報 */}
