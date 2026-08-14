@@ -22,6 +22,7 @@ export type Post = {
     content: string
     created_at: string
     avatar_url?: string | null
+    image_url?: string | null
     reply_to?: string | null
     reply_count?: number
     likes?: number
@@ -302,15 +303,15 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
     return (
         <div style={{ minHeight: "100vh", background: "#000", fontFamily: "sans-serif", color: "#fff", display: "flex", justifyContent: "space-between" }}>
             {/* 2. 左サイドバー（共通：PC） */}
-            <div 
-            className="pc-only"
-            style={{
-                width: "280px", padding: "20px 12px",
-                position: "sticky", top: 0, height: "100vh",
-                display: "flex", flexDirection: "column",
-                borderRight: "1px solid #333",
-                flexShrink: 0
-            }}>
+            <div
+                className="pc-only"
+                style={{
+                    width: "280px", padding: "20px 12px",
+                    position: "sticky", top: 0, height: "100vh",
+                    display: "flex", flexDirection: "column",
+                    borderRight: "1px solid #333",
+                    flexShrink: 0
+                }}>
                 {/* ロゴ */}
                 <div style={{ padding: "0px 0px", marginBottom: "12px" }}>
                     <img src="/logo-compact.svg" alt="Origo" style={{ height: "60px", width: "auto" }} />
@@ -363,7 +364,6 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                         );
                     })}
                 </nav>
-
                 {/* ユーザー情報 */}
                 <div
                     style={{
@@ -528,8 +528,8 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
           display: block !important;
         }
 
-        /* スマホ画面（767px以下）の場合 */
-        @media (max-width: 767px) {
+        /* スマホ画面（1200px以下）の場合 */
+        @media (max-width: 1200px) {
           .mobile-only {
             display: flex !important; /* または block */
           }
@@ -656,6 +656,7 @@ export function PostItem({
                 padding: "16px 20px",
                 display: "flex",
                 gap: "12px",
+                alignItems: "flex-start", // ★ ここを追加！(アバターを一番上に固定)
                 marginBottom: "3px", /* カード同士の間隔を開ける場合 */
             }}
         >
@@ -696,7 +697,20 @@ export function PostItem({
                 >
                     <LinkedText text={post.content} onLinkClick={onLinkClick} query={searchQuery} />
                 </p>
-
+                {post.image_url && (
+                    <img
+                        src={post.image_url}
+                        alt="添付画像"
+                        style={{
+                            maxWidth: "100%",
+                            maxHeight: "350px",
+                            borderRadius: "12px",
+                            marginTop: "10px",
+                            objectFit: "cover",
+                            border: "1px solid #333"
+                        }}
+                    />
+                )}
                 {/* アクションボタン（いいね・リプライ・削除） */}
                 <div style={{ display: "flex", gap: "16px" }}>
                     {/* いいねボタン */}

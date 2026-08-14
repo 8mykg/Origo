@@ -18,13 +18,15 @@ interface Room {
 export default function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const roomId = resolvedParams.id
-
   const [room, setRoom] = useState<Room | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [input, setInput] = useState("")
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [content, setContent] = useState("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   // 編集モード用の状態
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
@@ -130,24 +132,56 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  // 投稿作成
   const handlePost = async () => {
-    if (!input.trim() || input.length > 300 || !currentUser || submitting) return
-    setSubmitting(true)
+    const textContent = input.trim() || content.trim()
+    if ((!textContent && !imageFile) || !currentUser || uploading || submitting) return
 
-    const { error } = await supabase.from("posts").insert({
+    setSubmitting(true)
+    setUploading(true)
+    let imageUrl = null
+
+    // 1. 画像があれば Supabase Storage にアップロード
+    if (imageFile) {
+      const fileExt = imageFile.name.split(".").pop()
+      const fileName = `${Date.now()}_${Math.random()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("post-images")
+        .upload(fileName, imageFile)
+
+      if (uploadError) {
+        alert("画像のアップロードに失敗しました: " + uploadError.message)
+        setUploading(false)
+        setSubmitting(false)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("post-images")
+        .getPublicUrl(fileName)
+
+      imageUrl = publicUrlData.publicUrl
+    }
+
+    // 2. 部屋の投稿として DB に保存 (room_id を指定)
+    const { error: postError } = await supabase.from("posts").insert({
       user_name: currentUser.user_name,
-      content: input,
-      room_id: roomId, // 部屋IDを紐付け
+      content: textContent,
+      image_url: imageUrl,
+      room_id: roomId, // ★ 確実に部屋IDを紐付け！
     })
 
-    if (!error) {
-      setInput("")
-      fetchRoomPosts()
-    } else {
-      alert("投稿に失敗しました")
-    }
+    setUploading(false)
     setSubmitting(false)
+
+    if (postError) {
+      alert("投稿に失敗しました: " + postError.message)
+    } else {
+      setInput("")
+      setContent("")
+      setImageFile(null)
+      fetchRoomPosts() // 部屋の最新投稿を再取得
+    }
   }
 
   // いいね機能（TLと同じロジック）
@@ -279,7 +313,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
             ←
           </button>
           <div>
-            <h1 style={{ margin: 0, fontSize: "18px" }}>コミュ部屋一覧に戻る</h1>
+            <h1 style={{ margin: 0, fontSize: "18px" }}>コミュ部屋一覧</h1>
             <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>{posts.length}件の投稿</p>
           </div>
           {/* 部屋主だけに表示する「設定・削除」ボタン */}
@@ -440,20 +474,68 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
                 rows={3}
               />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #222", paddingTop: "12px", marginTop: "8px" }}>
-                <span style={{ color: input.length > 300 ? "#f00" : "#888", fontSize: "14px" }}>
+                <span style={{
+                  color: (300 - input.length) <= -1 ? "rgb(126, 0, 0)"
+                    : (300 - input.length) <= 0 ? "#f00"
+                      : (300 - input.length) <= 50 ? "#f1c40f"
+                        : (300 - input.length) <= 100 ? "#2ecc71"
+                          : (300 - input.length) <= 200 ? "#2ec1cc"
+                            : "#888",
+                  fontSize: "14px"
+                }}>
                   {300 - input.length}
                 </span>
-                <button
-                  onClick={handlePost}
-                  disabled={!input.trim() || input.length > 300 || submitting}
-                  style={{
-                    background: !input.trim() || input.length > 300 || submitting ? "#555" : "#1d9bf0",
-                    color: "white", border: "none", borderRadius: "24px",
-                    padding: "8px 20px", fontWeight: "bold",
-                    fontSize: "15px", cursor: !input.trim() || input.length > 300 || submitting ? "not-allowed" : "pointer"
-                  }}>
-                  {submitting ? "送信中..." : "投稿する"}
-                </button>
+                {/* 選択した画像のプレビュー表示 */}
+                {imageFile && (
+                  <div style={{ position: "relative", marginBottom: "10px" }}>
+                    <img
+                      src={URL.createObjectURL(imageFile)}
+                      alt="Preview"
+                      style={{ maxHeight: "200px", borderRadius: "12px", objectFit: "cover" }}
+                    />
+                    <button
+                      onClick={() => setImageFile(null)}
+                      style={{ position: "absolute", top: "5px", left: "5px", background: "rgba(0,0,0,0.7)", color: "#fff", border: "none", borderRadius: "30%", cursor: "pointer" }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "16px", marginTop: "10px" }}>
+                  {/* 画像選択ボタン */}
+                  <label style={{ cursor: "pointer", fontSize: "20px" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      {/* カメラのボディ */}
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      {/* レンズ */}
+                      <circle cx="12" cy="13" r="4" />
+                      {/* フラッシュ部分の点 */}
+                      <line x1="19" y1="9" x2="19.01" y2="9" />
+                    </svg>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setImageFile(e.target.files[0])
+                        }
+                      }}
+                    />
+                  </label>
+                  <button
+                    onClick={handlePost}
+                    disabled={!input.trim() || input.length > 300 || submitting}
+                    style={{
+                      background: !input.trim() || input.length > 300 || submitting ? "#555" : "#1d9bf0",
+                      color: "white", border: "none", borderRadius: "24px",
+                      padding: "8px 20px", fontWeight: "bold",
+                      fontSize: "15px", cursor: !input.trim() || input.length > 300 || submitting ? "not-allowed" : "pointer"
+                    }}>
+                    {submitting ? "送信中..." : "投稿する"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -490,8 +572,8 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
           display: block !important;
         }
 
-        /* スマホ画面（767px以下）の場合 */
-        @media (max-width: 767px) {
+        /* スマホ画面（1200px以下）の場合 */
+        @media (max-width: 1200px) {
           .mobile-only {
             display: flex !important; /* または block */
           }

@@ -27,6 +27,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<any | null>(null)
   const router = useRouter()
+  const [content, setContent] = useState("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -110,9 +113,53 @@ export default function Home() {
 
   const handlePost = async () => {
     if (!input.trim() || !currentUser) return
-    await supabase.from("posts").insert({ user_name: currentUser.user_name, content: input })
-    setInput("")
-    fetchPosts()
+    if (!content.trim() && !imageFile) return
+    const textContent = input.trim() || content.trim()
+    if ((!textContent && !imageFile) || !currentUser || uploading) return
+
+    setUploading(true)
+    let imageUrl = null
+    // 1. 画像が選択されていれば Supabase Storage にアップロード
+    // 1. 画像があれば Supabase Storage にアップロード
+    if (imageFile) {
+      const fileExt = imageFile.name.split(".").pop()
+      const fileName = `${Date.now()}_${Math.random()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("post-images")
+        .upload(fileName, imageFile)
+
+      if (uploadError) {
+        alert("画像のアップロードに失敗しました: " + uploadError.message)
+        setUploading(false)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("post-images")
+        .getPublicUrl(fileName)
+
+      imageUrl = publicUrlData.publicUrl
+    }
+
+    // 2. 投稿データを1回だけ DB に保存
+    const { error: postError } = await supabase.from("posts").insert({
+      user_name: currentUser.user_name,
+      content: textContent,
+      image_url: imageUrl,
+      room_id: null, // 通常のTL投稿
+    })
+
+    setUploading(false)
+
+    if (postError) {
+      alert("投稿に失敗しました: " + postError.message)
+    } else {
+      setInput("")
+      setContent("")
+      setImageFile(null)
+      fetchPosts() // 最新一覧を再取得
+    }
   }
 
   const handleLike = async (post: Post) => {
@@ -219,20 +266,68 @@ export default function Home() {
               rows={3}
             />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #333", paddingTop: "12px" }}>
-              <span style={{ color: input.length > 300 ? "#f00" : "#888", fontSize: "14px" }}>
+              <span style={{
+                color: (300 - input.length) <= -1 ? "rgb(126, 0, 0)"
+                  : (300 - input.length) <= 0 ? "#f00"
+                    : (300 - input.length) <= 50 ? "#f1c40f"
+                      : (300 - input.length) <= 100 ? "#2ecc71"
+                        : (300 - input.length) <= 200 ? "#2ec1cc"
+                          : "#888",
+                fontSize: "14px"
+              }}>
                 {300 - input.length}
               </span>
-              <button
-                onClick={handlePost}
-                disabled={!input.trim() || input.length > 300}
-                style={{
-                  background: !input.trim() || input.length > 300 ? "#555" : "#1d9bf0",
-                  color: "white", border: "none", borderRadius: "24px",
-                  padding: "8px 20px", fontWeight: "bold",
-                  fontSize: "15px", cursor: !input.trim() || input.length > 300 ? "not-allowed" : "pointer"
-                }}>
-                投稿する
-              </button>
+              {/* 選択した画像のプレビュー表示 */}
+              {imageFile && (
+                <div style={{ position: "relative", marginBottom: "10px" }}>
+                  <img
+                    src={URL.createObjectURL(imageFile)}
+                    alt="Preview"
+                    style={{ maxHeight: "200px", borderRadius: "12px", objectFit: "cover" }}
+                  />
+                  <button
+                    onClick={() => setImageFile(null)}
+                    style={{ position: "absolute", top: "5px", left: "5px", background: "rgba(0,0,0,0.7)", color: "#fff", border: "none", borderRadius: "30%", cursor: "pointer" }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "16px", marginTop: "10px" }}>
+                {/* 画像選択ボタン */}
+                <label style={{ cursor: "pointer", fontSize: "20px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {/* カメラのボディ */}
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    {/* レンズ */}
+                    <circle cx="12" cy="13" r="4" />
+                    {/* フラッシュ部分の点 */}
+                    <line x1="19" y1="9" x2="19.01" y2="9" />
+                  </svg>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setImageFile(e.target.files[0])
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  onClick={handlePost}
+                  disabled={!input.trim() || input.length > 300}
+                  style={{
+                    background: !input.trim() || input.length > 300 ? "#555" : "#1d9bf0",
+                    color: "white", border: "none", borderRadius: "24px",
+                    padding: "8px 20px", fontWeight: "bold",
+                    fontSize: "15px", cursor: !input.trim() || input.length > 300 ? "not-allowed" : "pointer"
+                  }}>
+                  投稿する
+                </button>
+              </div>
             </div>
           </div>
         </div>}

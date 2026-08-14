@@ -74,7 +74,7 @@ export default function AdminPage() {
       {/* 招待コード確認カード */}
       <div style={{ background: "#111", padding: "20px", borderRadius: "16px", border: "1px solid #333", maxWidth: "440px", marginBottom: "24px" }}>
         <h2 style={{ fontSize: "16px", color: "#aaa", margin: "0 0 16px" }}>🔑 日替わり招待コード</h2>
-        
+
         <div style={{ marginBottom: "16px" }}>
           <p style={{ color: "#888", margin: "0 0 4px", fontSize: "13px" }}>今日の招待コード（有効）</p>
           <p style={{ fontSize: "28px", fontWeight: "bold", color: "#1d9bf0", margin: 0, letterSpacing: "2px" }}>
@@ -89,6 +89,25 @@ export default function AdminPage() {
           </p>
         </div>
       </div>
+      <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
+
+        /* スマホ画面（1200px以下）の場合 */
+        @media (max-width: 1200px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

@@ -415,6 +415,25 @@ export default function AuthPage() {
           {loading ? "処理中..." : isLogin ? "ログイン" : "登録する"}
         </button>
       </div>
+      <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
+
+        /* スマホ画面（1200px以下）の場合 */
+        @media (max-width: 1200px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

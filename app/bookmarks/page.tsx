@@ -119,8 +119,8 @@ export default function BookmarksPage() {
           display: block !important;
         }
 
-        /* スマホ画面（767px以下）の場合 */
-        @media (max-width: 767px) {
+        /* スマホ画面（1200px以下）の場合 */
+        @media (max-width: 1200px) {
           .mobile-only {
             display: flex !important; /* または block */
           }
