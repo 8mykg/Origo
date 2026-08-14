@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react"
 import { supabase } from "../../lib/supabase"
 import { useRouter } from "next/navigation"
-import { PostSkeleton } from "../../components/CSSTransformation"
+import { FullScreenLoading } from "../../components/CSSTransformation"
 import { sendDeviceNotification } from "../../lib/notification"
 import Layout, { Reply, PostItem, Post, User } from "../../components/Layout"
 // ----------------------------------------------------
@@ -318,7 +318,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
     if (loading) return (
         <>
-            <PostSkeleton/>
+            <FullScreenLoading />
         </>
     )
 
@@ -523,6 +523,26 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     />
                 ))}
             </div>
+            {/* 画面切り替え用のCSS記述 */}
+            <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
+
+        /* スマホ画面（767px以下）の場合 */
+        @media (max-width: 767px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
             <Reply
                 targetPost={replyingTo}
                 onClose={() => setReplyingTo(null)}

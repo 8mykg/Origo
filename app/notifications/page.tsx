@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "../lib/supabase"
-import { PostSkeleton } from "../components/CSSTransformation"
+import { FullScreenLoading } from "../components/CSSTransformation"
 import Layout, { User } from "../components/Layout"
 import { requestNotificationPermission } from "../lib/notification"
 
@@ -127,7 +127,7 @@ export default function NotificationsPage() {
 
             {/* 通知一覧 */}
             {loading ? (
-                <PostSkeleton/>
+                <FullScreenLoading />
             ) : notifications.length === 0 ? (
                 <div style={{ padding: "40px 20px", color: "#888", textAlign: "center" }}>
                     まだ通知はありません
@@ -169,6 +169,26 @@ export default function NotificationsPage() {
                     ))}
                 </div>
             )}
+            {/* 画面切り替え用のCSS記述 */}
+      <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
+
+        /* スマホ画面（767px以下）の場合 */
+        @media (max-width: 767px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
         </Layout>
     )
 }

@@ -108,6 +108,25 @@ export default function CreateRoomModal({ isOpen, onClose, onCreated }: {
           </div>
         </form>
       </div>
+      <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
+
+        /* スマホ画面（767px以下）の場合 */
+        @media (max-width: 767px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

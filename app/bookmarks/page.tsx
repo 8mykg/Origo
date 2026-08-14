@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
-import { PostSkeletonList } from "../components/CSSTransformation"
+import { FullScreenLoading } from "../components/CSSTransformation"
 import Layout, { Reply, PostItem, Post, User } from "../components/Layout"
 
 export default function BookmarksPage() {
@@ -92,7 +92,7 @@ export default function BookmarksPage() {
       </div>
 
       {loading ? (
-          <PostSkeletonList />
+        <FullScreenLoading />
       ) : posts.length === 0 ? (
         <div style={{ padding: "60px 20px", color: "#888", textAlign: "center" }}>
           <p style={{ fontSize: "16px", color: "#fff", fontWeight: "bold" }}>まだブックマークがありません</p>
@@ -110,7 +110,25 @@ export default function BookmarksPage() {
           />
         ))
       )}
+      <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
 
+        /* スマホ画面（767px以下）の場合 */
+        @media (max-width: 767px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
       <Reply targetPost={replyingTo} onClose={() => setReplyingTo(null)} onSuccess={() => currentUser && fetchBookmarks(currentUser.user_name)} />
     </Layout>
   )

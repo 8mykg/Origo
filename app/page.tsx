@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic"
 import { useState, useEffect } from "react"
 import { supabase } from "./lib/supabase"
 import { useRouter } from "next/navigation"
-import { PostSkeletonList } from "./components/CSSTransformation"
+import { FullScreenLoading } from "./components/CSSTransformation"
 import { sendDeviceNotification } from "./lib/notification"
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false)
@@ -194,7 +194,7 @@ export default function Home() {
     <Layout
       Tab="home"
     >
-      <PostSkeletonList />
+      <FullScreenLoading />
     </Layout>
   )
 

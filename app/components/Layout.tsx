@@ -1,6 +1,6 @@
 // components/Layout.tsx
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, createContext, useContext } from "react"
 import { supabase } from "../lib/supabase"
 import { useRouter } from "next/navigation"
 import React from "react"
@@ -104,9 +104,6 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
     }
     const [activeTab, setActiveTab] = useState(Tab)
     const [currentUser, setCurrentUser] = useState<User | null>(null) // ★ ここに移動！
-
-    const isMobile = useIsMobile()
-
     useEffect(() => {
         const init = async () => {
             const { data: { session } } = await supabase.auth.getSession()
@@ -203,7 +200,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
         {
             id: "rooms",
             icon: (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 3v18"></path>
                     <path d="M19 21V3H9"></path>
                     <path d="M5 3l10 2v14L5 21z"></path>
@@ -305,7 +302,9 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
     return (
         <div style={{ minHeight: "100vh", background: "#000", fontFamily: "sans-serif", color: "#fff", display: "flex", justifyContent: "space-between" }}>
             {/* 2. 左サイドバー（共通：PC） */}
-            {!isMobile && (<div style={{
+            <div 
+            className="pc-only"
+            style={{
                 width: "280px", padding: "20px 12px",
                 position: "sticky", top: 0, height: "100vh",
                 display: "flex", flexDirection: "column",
@@ -389,115 +388,114 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                         ↩
                     </button>
                 </div>
-            </div>)}
+            </div>
 
             {/* 3. メインコンテンツ領域 */}
-            <div style={{ flex: 1, borderRight: isMobile ? "none" : "1px solid #333", borderLeft: isMobile ? "none" : "1px solid #333", paddingBottom: isMobile ? "80px" : "0" }}>
+            <div style={{ flex: 1 }}>
                 {children}
             </div>
 
             {/* 4. 右サイドバー（共通：PC） */}
-            {!isMobile && (
-                <div
-                    style={{
-                        width: "320px",
-                        padding: "20px 16px",
-                        position: "sticky",
-                        top: 0,
-                        height: "100vh",
-                        overflowY: "auto",
-                        flexShrink: 0,
-                        borderLeft: "1px solid #333",
-                    }}
-                >
-                    {/* 検索欄 */}
-                    <div style={{ position: "relative", marginBottom: "16px" }}>
-                        <span
-                            style={{
-                                position: "absolute",
-                                left: "14px",
-                                top: "50%",
-                                transform: "translateY(-50%)",
-                                fontSize: "16px",
-                            }}
-                        >
-                            <img
-                                src={"/search.svg"}
-                                alt="search"
-                                style={{ width: "16px", height: "16px" }}
-                            />
-                        </span>
-                        <input
-                            placeholder="検索"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={handleSearch}
-                            style={{
-                                width: "100%",
-                                background: "#111",
-                                border: "1px solid #333",
-                                borderRadius: "24px",
-                                padding: "12px 12px 12px 44px",
-                                color: "#fff",
-                                fontSize: "15px",
-                                outline: "none",
-                                boxSizing: "border-box",
-                            }}
+            <div
+                className="pc-only"
+                style={{
+                    width: "320px",
+                    padding: "20px 16px",
+                    position: "sticky",
+                    top: 0,
+                    height: "100vh",
+                    overflowY: "auto",
+                    flexShrink: 0,
+                    borderLeft: "1px solid #333",
+                }}
+            >
+                {/* 検索欄 */}
+                <div style={{ position: "relative", marginBottom: "16px" }}>
+                    <span
+                        style={{
+                            position: "absolute",
+                            left: "14px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            fontSize: "16px",
+                        }}
+                    >
+                        <img
+                            src={"/search.svg"}
+                            alt="search"
+                            style={{ width: "16px", height: "16px" }}
                         />
-                    </div>
-
-                    {/* トレンド */}
-                    <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
-                        <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>トレンド</h2>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                            {trends.length === 0 ? (
-                                <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>トレンドはありません</p>
-                            ) : (
-                                trends.map((item, i) => (
-                                    <div
-                                        key={item.tag}
-                                        onClick={() => handleTagClick(item.tag)}
-                                        style={{
-                                            borderBottom: i < trends.length - 1 ? "1px solid #222" : "none",
-                                            paddingBottom: i < trends.length - 1 ? "12px" : "0",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <p style={{ margin: "0 0 2px", fontSize: "13px", color: "#888" }}>日本のトレンド</p>
-                                        <p style={{ margin: "0 0 2px", fontWeight: "bold", fontSize: "15px", color: "#fff" }}>
-                                            {item.tag}
-                                        </p>
-                                        <p style={{ margin: 0, fontSize: "12px", color: "#666" }}>
-                                            {item.count}件のポスト
-                                        </p>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                    {/* おすすめユーザー */}
-                    <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
-                        <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
-                        <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>開発中！</p>
-                    </div>
-
-                    <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
-                        Copyright © 2026{" "}
-                        <a
-                            href="https://origo-ochre.vercel.app/profile?user=8mykg"
-                            style={{ color: "#4da6ff", textDecoration: "underline" }}
-                        >
-                            tumayouzi_Dev.
-                        </a>{" "}
-                        All rights reserved.
-                    </p>
+                    </span>
+                    <input
+                        placeholder="検索"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={handleSearch}
+                        style={{
+                            width: "100%",
+                            background: "#111",
+                            border: "1px solid #333",
+                            borderRadius: "24px",
+                            padding: "12px 12px 12px 44px",
+                            color: "#fff",
+                            fontSize: "15px",
+                            outline: "none",
+                            boxSizing: "border-box",
+                        }}
+                    />
                 </div>
-            )}
+
+                {/* トレンド */}
+                <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
+                    <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>トレンド</h2>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                        {trends.length === 0 ? (
+                            <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>トレンドはありません</p>
+                        ) : (
+                            trends.map((item, i) => (
+                                <div
+                                    key={item.tag}
+                                    onClick={() => handleTagClick(item.tag)}
+                                    style={{
+                                        borderBottom: i < trends.length - 1 ? "1px solid #222" : "none",
+                                        paddingBottom: i < trends.length - 1 ? "12px" : "0",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    <p style={{ margin: "0 0 2px", fontSize: "13px", color: "#888" }}>日本のトレンド</p>
+                                    <p style={{ margin: "0 0 2px", fontWeight: "bold", fontSize: "15px", color: "#fff" }}>
+                                        {item.tag}
+                                    </p>
+                                    <p style={{ margin: 0, fontSize: "12px", color: "#666" }}>
+                                        {item.count}件のポスト
+                                    </p>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* おすすめユーザー */}
+                <div style={{ background: "#111", borderRadius: "16px", padding: "16px", marginBottom: "16px" }}>
+                    <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 16px" }}>おすすめユーザー</h2>
+                    <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>開発中！</p>
+                </div>
+
+                <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
+                    Copyright © 2026{" "}
+                    <a
+                        href="https://origo-ochre.vercel.app/profile?user=8mykg"
+                        style={{ color: "#4da6ff", textDecoration: "underline" }}
+                    >
+                        tumayouzi_Dev.
+                    </a>{" "}
+                    All rights reserved.
+                </p>
+            </div>
 
             {/* 5. 下部バー（共通：スマホ） */}
-            {isMobile && (<div style={{
+            <div className="mobile-only" style={{
                 position: "fixed", bottom: 0, left: 0, right: 0,
                 background: "rgba(0,0,0,0.9)",
                 backdropFilter: "blur(12px)",
@@ -520,7 +518,26 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     </button>
                 ))}
             </div>
-            )}
+            {/* 画面切り替え用のCSS記述 */}
+            <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
+
+        /* スマホ画面（767px以下）の場合 */
+        @media (max-width: 767px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
         </div>
     )
 }

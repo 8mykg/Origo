@@ -78,33 +78,3 @@ function OrigoSpinner({ size = 48 }: { size?: number }) {
     </div>
   )
 }
-
-// 2. X/Twitterっぽい骨組みローディング（ポスト用）
-export function PostSkeleton() {
-  return (
-    <div style={{ padding: "16px", borderBottom: "1px solid #222", display: "flex", gap: "12px" }}>
-      {/* アバター丸枠 */}
-      <div className="skeleton" style={{ width: "40px", height: "40px", borderRadius: "50%", flexShrink: 0 }} />
-      
-      {/* 本文エリア */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
-        <div className="skeleton" style={{ width: "35%", height: "14px" }} />
-        <div className="skeleton" style={{ width: "90%", height: "14px" }} />
-        <div className="skeleton" style={{ width: "60%", height: "14px" }} />
-      </div>
-    </div>
-  )
-}
-
-// 骨組みを複数個並べて表示するコンポーネント
-export function PostSkeletonList() {
-  return (
-    <div>
-      <PostSkeleton />
-      <PostSkeleton />
-      <PostSkeleton />
-      <PostSkeleton />
-      <PostSkeleton />
-    </div>
-  )
-}

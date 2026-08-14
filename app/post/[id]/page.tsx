@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabase"
-import { PostSkeletonList } from "../../components/CSSTransformation"
+import { FullScreenLoading } from "../../components/CSSTransformation"
 import { sendDeviceNotification } from "../../lib/notification"
 import Layout, { Reply, PostItem, Post, User, LinkedText } from "../../components/Layout"
 
@@ -223,7 +223,7 @@ export default function PostDetailPage() {
   if (loading) {
     return (
       <Layout Tab="home">
-        <PostSkeletonList />
+        <FullScreenLoading />
       </Layout>
     )
   }
@@ -406,7 +406,26 @@ export default function PostDetailPage() {
           ))
         )}
       </div>
+      {/* 画面切り替え用のCSS記述 */}
+      <style jsx global>{`
+        /* デフォルト（PC画面） */
+        .mobile-only {
+          display: none !important;
+        }
+        .pc-only {
+          display: block !important;
+        }
 
+        /* スマホ画面（767px以下）の場合 */
+        @media (max-width: 767px) {
+          .mobile-only {
+            display: flex !important; /* または block */
+          }
+          .pc-only {
+            display: none !important;
+          }
+        }
+      `}</style>
       {/* 返信モーダル */}
       <Reply
         targetPost={replyingTo}
