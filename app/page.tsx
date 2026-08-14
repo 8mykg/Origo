@@ -311,7 +311,17 @@ export default function Home() {
                     style={{ display: "none" }}
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        setImageFile(e.target.files[0])
+                        const file = e.target.files[0]
+                        const maxSize = 30 * 1024 * 1024 // 30MB (バイト単位: 30メガバイト)
+
+                        // ファイルサイズチェック
+                        if (file.size > maxSize) {
+                          alert("ンアー！(≧Д≦)ファイルサイズがデカすぎます！30MB以下の画像を選択してください。")
+                          e.target.value = "" // 選択をリセット
+                          return
+                        }
+
+                        setImageFile(file)
                       }
                     }}
                   />
