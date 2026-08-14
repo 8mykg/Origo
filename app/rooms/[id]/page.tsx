@@ -536,14 +536,19 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
                   </label>
                   <button
                     onClick={handlePost}
-                    disabled={!input.trim() || input.length > 300 || submitting}
+                    disabled={(!input.trim() && !content.trim() && !imageFile) || uploading}
                     style={{
-                      background: !input.trim() || input.length > 300 || submitting ? "#555" : "#1d9bf0",
-                      color: "white", border: "none", borderRadius: "24px",
-                      padding: "8px 20px", fontWeight: "bold",
-                      fontSize: "15px", cursor: !input.trim() || input.length > 300 || submitting ? "not-allowed" : "pointer"
-                    }}>
-                    {submitting ? "送信中..." : "投稿する"}
+                      // 画像が選ばれているか文字があれば明るい青、なければ薄い灰色にする例
+                      background: (input.trim() || content.trim() || imageFile) ? "#1d9bf0" : "#1d9bf088",
+                      color: "#fff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "20px",
+                      fontWeight: "bold",
+                      cursor: (input.trim() || content.trim() || imageFile) ? "pointer" : "not-allowed"
+                    }}
+                  >
+                    {submitting ? "送信中..." : "投稿"}
                   </button>
                 </div>
               </div>

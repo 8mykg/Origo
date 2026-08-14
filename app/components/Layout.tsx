@@ -214,8 +214,8 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                 setActiveTab("rooms")
                 window.location.href = "/rooms"
             },
-            soon: true,
-            beta: true
+            soon: false,
+            beta: false
         },
         {
             id: "search",

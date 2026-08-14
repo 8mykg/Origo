@@ -112,10 +112,10 @@ export default function Home() {
   }
 
   const handlePost = async () => {
-    if (!input.trim() || !currentUser) return
-    if (!content.trim() && !imageFile) return
     const textContent = input.trim() || content.trim()
+    // 文字も画像も両方空っぽの場合、またはユーザー情報がない場合は中断
     if ((!textContent && !imageFile) || !currentUser || uploading) return
+    if (!content.trim() && !imageFile) return
 
     setUploading(true)
     let imageUrl = null
@@ -328,14 +328,19 @@ export default function Home() {
                 </label>
                 <button
                   onClick={handlePost}
-                  disabled={!input.trim() || input.length > 300}
+                  disabled={(!input.trim() && !content.trim() && !imageFile) || uploading}
                   style={{
-                    background: !input.trim() || input.length > 300 ? "#555" : "#1d9bf0",
-                    color: "white", border: "none", borderRadius: "24px",
-                    padding: "8px 20px", fontWeight: "bold",
-                    fontSize: "15px", cursor: !input.trim() || input.length > 300 ? "not-allowed" : "pointer"
-                  }}>
-                  投稿する
+                    // 画像が選ばれているか文字があれば明るい青、なければ薄い灰色にする例
+                    background: (input.trim() || content.trim() || imageFile) ? "#1d9bf0" : "#1d9bf088",
+                    color: "#fff",
+                    border: "none",
+                    padding: "8px 16px",
+                    borderRadius: "20px",
+                    fontWeight: "bold",
+                    cursor: (input.trim() || content.trim() || imageFile) ? "pointer" : "not-allowed"
+                  }}
+                >
+                  {uploading ? "送信中..." : "ポスト"}
                 </button>
               </div>
             </div>
