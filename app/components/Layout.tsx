@@ -3,6 +3,7 @@
 import { useState, useEffect, createContext, useContext } from "react"
 import { supabase } from "../lib/supabase"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import React from "react"
 const useIsMobile = () => {
     const [isMobile, setIsMobile] = useState(false)
@@ -363,6 +364,10 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                             </button>
                         );
                     })}
+                    <div style={{ padding: "16px", fontSize: "12px", color: "#666", display: "flex", gap: "12px" }}>
+                        <Link href="/terms" style={{ color: "#666", textDecoration: "none" }}>利用規約</Link>
+                        <Link href="/privacy" style={{ color: "#666", textDecoration: "none" }}>プライバシーポリシー</Link>
+                    </div>
                 </nav>
                 {/* ユーザー情報 */}
                 <div
