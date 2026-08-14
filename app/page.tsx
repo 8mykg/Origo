@@ -316,7 +316,7 @@ export default function Home() {
 
                         // ファイルサイズチェック
                         if (file.size > maxSize) {
-                          alert("ンアー！(≧Д≦)ファイルサイズがデカすぎます！30MB以下の画像を選択してください。")
+                          alert("ンアー！(≧Д≦)ファイルサイズがデカすぎます！30MB以下の画像を選択してください！")
                           e.target.value = "" // 選択をリセット
                           return
                         }
