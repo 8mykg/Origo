@@ -116,7 +116,6 @@ export default function Home() {
     const textContent = input.trim() || content.trim()
     // 文字も画像も両方空っぽの場合、またはユーザー情報がない場合は中断
     if ((!textContent && !imageFile) || !currentUser || uploading) return
-    if (!content.trim() && !imageFile) return
 
     setUploading(true)
     let imageUrl = null
