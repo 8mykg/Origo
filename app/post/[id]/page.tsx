@@ -90,6 +90,7 @@ export default function PostDetailPage() {
           likes: likesData?.filter((l) => l.post_id === postData.id).length || 0,
           liked: likesData?.some((l) => l.post_id === postData.id && l.user_name === currentUser.user_name),
           bookmarked: bookmarksData?.some((b) => b.post_id === postData.id && b.user_name === currentUser.user_name),
+          bookmarks_count: bookmarksData?.filter((b) => b.post_id === postData.id).length || 0, // ★ ここを追加！
           reply_count: replyCount,
           reply_to_user: replyToUser,
         })
@@ -116,6 +117,7 @@ export default function PostDetailPage() {
             likes: likesData?.filter((l) => l.post_id === reply.id).length || 0,
             liked: likesData?.some((l) => l.post_id === reply.id && l.user_name === currentUser.user_name),
             bookmarked: bookmarksData?.some((b) => b.post_id === reply.id && b.user_name === currentUser.user_name),
+            bookmarks_count: bookmarksData?.filter((b) => b.post_id === reply.id).length || 0, // ★ ここを追加！
             reply_count: subReplyCount,
           }
         })
@@ -129,6 +131,38 @@ export default function PostDetailPage() {
       setLoading(false)
     }
   }
+
+  const [viewsCount, setViewsCount] = useState<number>(0)
+  const [hasViewed, setHasViewed] = useState<boolean>(false)
+
+  useEffect(() => {
+    const recordAndFetchViews = async () => {
+      // 1. 現在ログインしているユーザーを取得
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        // 2. 閲覧ログを追加（既に閲覧済みの場合はDB側で重複が無視されます）
+        await supabase.from("post_views").upsert(
+          { post_id: postId, user_id: user.id },
+          { onConflict: "post_id,user_id", ignoreDuplicates: true }
+        )
+      }
+
+      // 3. 最新の閲覧数を取得
+      const { count } = await supabase
+        .from("post_views")
+        .select("*", { count: "exact", head: true })
+        .eq("post_id", postId)
+
+      if (count !== null) {
+        setViewsCount(count)
+      }
+    }
+
+    if (postId) {
+      recordAndFetchViews()
+    }
+  }, [postId])
 
   // いいね処理（Optimistic Update）
   const handleLike = async (post: Post) => {
@@ -179,12 +213,24 @@ export default function PostDetailPage() {
     const isMain = post.id === mainPost?.id
     const nextBookmarked = !post.bookmarked
 
-    // 1. UIを即座に更新（待ち時間ゼロにする）
+    // ★ カウントの増減計算（現在の件数をベースに +1 または -1）
+    const currentCount = post.bookmarks_count ?? 0
+    const nextCount = nextBookmarked ? currentCount + 1 : Math.max(0, currentCount - 1)
+
+    // 1. UIを即座に更新
     if (isMain && mainPost) {
-      setMainPost({ ...mainPost, bookmarked: nextBookmarked })
+      setMainPost({
+        ...mainPost,
+        bookmarked: nextBookmarked,
+        bookmarks_count: nextCount // ★ 件数を更新
+      })
     } else {
       setReplies((prev) =>
-        prev.map((r) => (r.id === post.id ? { ...r, bookmarked: nextBookmarked } : r))
+        prev.map((r) =>
+          r.id === post.id
+            ? { ...r, bookmarked: nextBookmarked, bookmarks_count: nextCount } // ★ 件数を更新
+            : r
+        )
       )
     }
 
@@ -367,8 +413,18 @@ export default function PostDetailPage() {
               alt="bookmark"
               style={{ width: "16px", height: "16px" }}
             />
-            <span>{mainPost.bookmarked ? 1 : 0}</span>
+            <span>{mainPost.bookmarks_count ?? 0}</span>
           </button>
+          {/* 閲覧数の表示箇所 */}
+          <div
+            style={{
+              background: "none", border: "none", color: "#888",
+              fontSize: "14px", display: "flex",
+              alignItems: "center", gap: "6px", padding: "0px 0px", borderRadius: "20px"
+            }}>
+            <img src="/view.svg" alt="views" style={{ width: "18px", height: "18px" }} />
+            <span>{viewsCount ?? 0}回表示</span>
+          </div>
 
           {/* 削除ボタン */}
           {mainPost.user_name === currentUser?.user_name && (
@@ -432,6 +488,6 @@ export default function PostDetailPage() {
         onClose={() => setReplyingTo(null)}
         onSuccess={fetchPostAndReplies}
       />
-    </Layout>
+    </Layout >
   )
 }

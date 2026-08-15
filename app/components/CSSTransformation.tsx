@@ -1,12 +1,14 @@
+import { useState, useEffect } from "react";
+
 // 1. 回転スピナー
-export function FullScreenLoading({ text = "読み込み中..." }: { text?: string }) {
+export function FullScreenLoading({ text = "読み込み中" }: { text?: string }) {
   return (
     <div className="loading-full-container">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px" }}>
-        {/* スピナーサイズ大きめ（64px） */}
+        {/* スピナーサイズ大きめ（256px） */}
         <OrigoSpinner size={256} />
-        
-        {/* テキストもほんのり光る感じに */}
+
+        {/* 動くテキスト表示エリア */}
         {text && (
           <p
             style={{
@@ -17,13 +19,33 @@ export function FullScreenLoading({ text = "読み込み中..." }: { text?: stri
               margin: 0,
             }}
           >
-            {text}
+            <LoadingText text={text} />
           </p>
         )}
       </div>
     </div>
   )
 }
+
+// ドットが動くテキストコンポーネント（テキストを外部から受け取れるように変更）
+function LoadingText({ text = "読み込み中" }: { text?: string }) {
+  const [dots, setDots] = useState("");
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 10);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <span>
+      {text}{dots}
+    </span>
+  );
+}
+
 function OrigoSpinner({ size = 48 }: { size?: number }) {
   return (
     <div

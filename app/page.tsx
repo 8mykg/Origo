@@ -105,6 +105,7 @@ export default function Home() {
         likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
         liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
         bookmarked: bookmarksData?.some((b) => b.post_id === post.id && b.user_name === currentUser?.user_name),
+        bookmarks_count: bookmarksData?.filter((b) => b.post_id === post.id).length || 0 // ★ ここを追加！
       }
     })
 

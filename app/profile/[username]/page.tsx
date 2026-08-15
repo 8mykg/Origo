@@ -250,6 +250,18 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             })
             setIsFollowing(true)
             setFollowersCount((prev) => prev + 1)
+            // ① DBに通知保存
+            await supabase.from("notifications").insert({
+                user_name: profileUser.user_name,
+                actor_name: currentUser.user_name,
+                type: "follow",
+                post_id: null,
+            })
+
+            // ② 実デバイス通知を飛ばす（相手の端末で許可されていれば届きます）
+            sendDeviceNotification("新しいフォロー！", {
+                body: `@${currentUser.user_name} さんがあなたをフォローしました`,
+            })
         }
     }
 

@@ -20,7 +20,18 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
 
-  const handleSubmit = async () => {
+  // タブ切り替え時のリセット処理
+  const handleTabChange = (toLogin: boolean) => {
+    setIsLogin(toLogin)
+    setError("")
+    setPassword("")
+    setConfirmPassword("")
+    setAvatarFile(null)
+    setAvatarPreview(null)
+  }
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setError("")
 
     if (!isLogin && password !== confirmPassword) {
@@ -36,14 +47,40 @@ export default function AuthPage() {
     setLoading(true)
 
     if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setError("メールアドレスかパスワードが違います")
+      // --- ログイン処理 ---
+      const inputStr = email.trim()
+      let loginEmail = inputStr
+
+      // 先頭が "@" で始まる場合、RPCを呼んで auth.users の email を取得
+      if (inputStr.startsWith("@")) {
+        const userNameToSearch = inputStr.slice(1).trim() // 先頭の "@" を除去
+
+        const { data: fetchedEmail, error: rpcError } = await supabase.rpc(
+          "get_email_by_username",
+          { username_input: userNameToSearch }
+        )
+
+        if (rpcError) {
+          console.error("RPC Error:", rpcError)
+        }
+
+        // メールアドレスが見つかればセット、なければダミー値でログイン失敗へ
+        loginEmail = fetchedEmail || "invalid_user_dummy@invalid.local"
+      }
+
+      // Supabase Auth でログイン実行
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password,
+      })
+
+      if (authError) {
+        setError("メールアドレス/ユーザー名 または パスワードが違います")
       } else {
         window.location.href = "/"
       }
     } else {
-
+      // --- 新規登録処理 ---
       if (!Invitationcode.trim()) {
         setError("招待コードを入力してください(開発者に聞いてください)")
         setLoading(false)
@@ -57,18 +94,21 @@ export default function AuthPage() {
         return
       }
 
+      // ユーザー名の整形 (先頭の@を取り除き、余計な空白を削る)
+      const cleanUserName = userName.trim().replace(/^@/, "")
 
-      if (!userName.trim()) {
+      if (!cleanUserName) {
         setError("ユーザー名を入力してください")
         setLoading(false)
         return
       }
 
+      // ユーザー名の重複チェック (大文字小文字を区別しない ilike を使用)
       const { data: existing } = await supabase
         .from("users")
-        .select("*")
-        .eq("user_name", userName)
-        .single()
+        .select("id")
+        .ilike("user_name", cleanUserName)
+        .maybeSingle()
 
       if (existing) {
         setError("そのユーザー名はすでに使われています")
@@ -76,21 +116,22 @@ export default function AuthPage() {
         return
       }
 
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email,
+      // Supabase Auth にアカウントを作成
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
         password,
         options: {
-          data: { user_name: userName }
-        }
+          data: { user_name: cleanUserName },
+        },
       })
 
-      if (error) {
-        setError("登録に失敗しました: " + error.message)
+      if (signUpError) {
+        setError("登録に失敗しました: " + signUpError.message)
         setLoading(false)
         return
       }
 
-      // アバターアップロード
+      // アバター画像のアップロード
       let avatarUrl = null
       if (avatarFile && signUpData.user) {
         const filePath = `${signUpData.user.id}/avatar.jpg`
@@ -104,14 +145,21 @@ export default function AuthPage() {
         }
       }
 
-      // usersテーブルに登録
+      // public.users テーブルにユーザープロファイルを登録 (email は含めない)
       if (signUpData.user) {
-        await supabase.from("users").insert({
+        const { error: insertError } = await supabase.from("users").insert({
           id: signUpData.user.id,
-          user_name: userName,
-          display_name: displayName.trim() || userName,
+          user_name: cleanUserName,
+          display_name: displayName.trim() || cleanUserName,
           avatar_url: avatarUrl,
         })
+
+        if (insertError) {
+          console.error("public.users 保存エラー:", insertError)
+          setError("プロフィールの保存に失敗しました: " + insertError.message)
+          setLoading(false)
+          return
+        }
       }
 
       setConfirmSent(true)
@@ -173,7 +221,7 @@ export default function AuthPage() {
             ※メアドに送ったリンクを開かなくてもログインできます
           </p>
           <button
-            onClick={() => { setConfirmSent(false); setIsLogin(true) }}
+            onClick={() => { setConfirmSent(false); handleTabChange(true) }}
             style={{
               marginTop: "24px", width: "100%",
               background: "#1d9bf0", color: "white",
@@ -208,7 +256,8 @@ export default function AuthPage() {
           {["ログイン", "新規登録"].map((label, i) => (
             <button
               key={i}
-              onClick={() => { setIsLogin(i === 0); setError(""); setPassword(""); setConfirmPassword("") }}
+              type="button"
+              onClick={() => handleTabChange(i === 0)}
               style={{
                 flex: 1, background: "none", border: "none",
                 color: isLogin === (i === 0) ? "#fff" : "#888",
@@ -221,202 +270,216 @@ export default function AuthPage() {
           ))}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {/* ユーザー名（新規登録のみ） */}
-          {!isLogin && (
-            <>
-              <input
-                placeholder="招待コード"
-                value={Invitationcode}
-                onChange={(e) => setInvitationcode(e.target.value)}
-                style={inputStyle}
-              />
+        {/* フォーム構造化 */}
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {/* 新規登録専用フィールド */}
+            {!isLogin && (
+              <>
+                <input
+                  placeholder="招待コード"
+                  value={Invitationcode}
+                  onChange={(e) => setInvitationcode(e.target.value)}
+                  style={inputStyle}
+                />
 
-              <input
-                placeholder="ユーザー名(@なし)"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                style={inputStyle}
-              />
+                <input
+                  placeholder="ユーザー名(@なし)"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  style={inputStyle}
+                />
 
-              {/* 表示名 */}
-              <input
-                placeholder="表示名(任意)"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                style={inputStyle}
-              />
+                <input
+                  placeholder="表示名(任意)"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  style={inputStyle}
+                />
 
-              {/* アイコン選択 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                {/* プレビュー */}
-                <div style={{
-                  width: "56px", height: "56px", borderRadius: "50%",
-                  background: avatarPreview ? "transparent" : "#1d9bf0",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "22px", fontWeight: "bold", color: "#fff",
-                  overflow: "hidden", flexShrink: 0
-                }}>
-                  {avatarPreview ? (
-                    <img src={avatarPreview} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    userName[0]?.toUpperCase() || "?"
-                  )}
-                </div>
-
-                {/* ボタン */}
-                <div style={{ flex: 1 }}>
-                  <label style={{
-                    display: "block", width: "100%",
-                    background: "#222", border: "1px solid #444",
-                    borderRadius: "8px", padding: "10px",
-                    color: "#888", fontSize: "14px",
-                    cursor: "pointer", textAlign: "center",
-                    boxSizing: "border-box" as const
+                {/* アイコン選択 */}
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                  <div style={{
+                    width: "56px", height: "56px", borderRadius: "50%",
+                    background: avatarPreview ? "transparent" : "#1d9bf0",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "22px", fontWeight: "bold", color: "#fff",
+                    overflow: "hidden", flexShrink: 0
                   }}>
-                    アイコンを選ぶ（10MB以下）
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        if (file.size > 10 * 1024 * 1024) {
-                          setError("10MB以下の画像を選んでください")
-                          return
-                        }
-                        setAvatarFile(file)
-                        const reader = new FileReader()
-                        reader.onload = () => setAvatarPreview(reader.result as string)
-                        reader.readAsDataURL(file)
-                      }}
-                    />
-                  </label>
-                  {avatarPreview && (
-                    <button
-                      onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
-                      style={{
-                        background: "none", border: "none",
-                        color: "#888", fontSize: "13px",
-                        cursor: "pointer", marginTop: "4px"
-                      }}>
-                      ✕ 削除
-                    </button>
-                  )}
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      userName[0]?.toUpperCase() || "?"
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label style={{
+                      display: "block", width: "100%",
+                      background: "#222", border: "1px solid #444",
+                      borderRadius: "8px", padding: "10px",
+                      color: "#888", fontSize: "14px",
+                      cursor: "pointer", textAlign: "center",
+                      boxSizing: "border-box" as const
+                    }}>
+                      アイコンを選ぶ（10MB以下）
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          if (file.size > 10 * 1024 * 1024) {
+                            setError("10MB以下の画像を選んでください")
+                            return
+                          }
+                          setAvatarFile(file)
+                          const reader = new FileReader()
+                          reader.onload = () => setAvatarPreview(reader.result as string)
+                          reader.readAsDataURL(file)
+                        }}
+                      />
+                    </label>
+                    {avatarPreview && (
+                      <button
+                        type="button"
+                        onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
+                        style={{
+                          background: "none", border: "none",
+                          color: "#888", fontSize: "13px",
+                          cursor: "pointer", marginTop: "4px"
+                        }}>
+                        ✕ 削除
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          {/* メール */}
-          <input
-            placeholder="メールアドレス"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={inputStyle}
-          />
-
-          {/* パスワード */}
-          <div style={{ position: "relative" }}>
+            {/* メール / ユーザー名 */}
             <input
-              placeholder="パスワード（6文字以上）"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ ...inputStyle, paddingRight: "44px" }}
+              placeholder={isLogin ? "メールアドレス または @ユーザー名" : "メールアドレス"}
+              type={isLogin ? "text" : "email"}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={inputStyle}
             />
-            <button
-              onClick={() => setShowPassword(!showPassword)}
-              style={eyeButtonStyle}>
-              {showPassword ? "🙈" : "👁️"}
-            </button>
-          </div>
 
-          {/* 確認用パスワード（新規登録のみ） */}
-          {!isLogin && (
+            {/* パスワード */}
             <div style={{ position: "relative" }}>
               <input
-                placeholder="パスワードをもう一度"
-                type={showConfirmPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSubmit() }}
-                style={{
-                  ...inputStyle,
-                  paddingRight: "44px",
-                  borderColor: confirmPassword && password !== confirmPassword ? "#f44" : "#444"
-                }}
+                placeholder="パスワード（6文字以上）"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ ...inputStyle, paddingRight: "44px" }}
               />
               <button
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={eyeButtonStyle}>
-                {showConfirmPassword ? "🙈" : "👁️"}
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={eyeButtonStyle}
+              >
+                <img
+                  src={showPassword ? "/Show.svg" : "/hide.svg"}
+                  alt={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+                  style={{ width: "20px", height: "20px", display: "block" }}
+                />
               </button>
-              {/* パスワード一致チェック */}
-              {confirmPassword && (
-                <p style={{
-                  margin: "4px 0 0",
-                  fontSize: "12px",
-                  color: password === confirmPassword ? "#27c93f" : "#f44"
-                }}>
-                  {password === confirmPassword ? "✓ 一致しています" : "✗ 一致していません"}
-                </p>
-              )}
             </div>
-          )}
-          {/* 区切り線 */}
-          <div style={{
-            display: "flex", alignItems: "center",
-            gap: "12px", marginTop: "16px"
-          }}>
-            <div style={{ flex: 1, height: "1px", background: "#333" }} />
-            <span style={{ color: "#888", fontSize: "13px" }}>または</span>
-            <div style={{ flex: 1, height: "1px", background: "#333" }} />
-          </div>
 
-          {/* Googleログインボタン */}
-          <button
-            onClick={handleGoogleLogin}
-            style={{
-              width: "100%", marginTop: "16px",
-              background: "#fff", color: "#000",
-              border: "none", borderRadius: "24px",
-              padding: "12px", fontWeight: "bold",
-              fontSize: "16px", cursor: "pointer",
-              display: "flex", alignItems: "center",
-              justifyContent: "center", gap: "8px"
-            }}>
-            <img
-              src="https://www.google.com/favicon.ico"
-              width="30" height="30"
-              alt="Google"
-            />
-            Googleで{isLogin ? "ログイン" : "登録"}
-          </button>
+            {/* 確認用パスワード（新規登録のみ） */}
+            {!isLogin && (
+              <div style={{ position: "relative" }}>
+                <input
+                  placeholder="パスワードをもう一度"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={{
+                    ...inputStyle,
+                    paddingRight: "44px",
+                    borderColor: confirmPassword && password !== confirmPassword ? "#f44" : "#444"
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={eyeButtonStyle}>
+                  <img
+                    src={showConfirmPassword ? "/Show.svg" : "/hide.svg"}
+                    alt={showConfirmPassword ? "パスワードを隠す" : "パスワードを表示"}
+                    style={{ width: "20px", height: "20px", display: "block" }}
+                  />
+                </button>
+                {confirmPassword && (
+                  <p style={{
+                    margin: "4px 0 0",
+                    fontSize: "12px",
+                    color: password === confirmPassword ? "#27c93f" : "#f44"
+                  }}>
+                    {password === confirmPassword ? "✓ 一致しています" : "✗ 一致していません"}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* エラーメッセージ */}
+            {error && (
+              <p style={{ color: "#f44", fontSize: "14px", margin: "4px 0 0" }}>{error}</p>
+            )}
+
+            {/* 送信ボタン */}
+            <button
+              type="submit"
+              disabled={loading || (!isLogin && password !== confirmPassword)}
+              style={{
+                width: "100%", marginTop: "16px",
+                background: loading || (!isLogin && password !== confirmPassword) ? "#555" : "#1d9bf0",
+                color: "white", border: "none", borderRadius: "24px",
+                padding: "12px", fontWeight: "bold",
+                fontSize: "16px",
+                cursor: loading || (!isLogin && password !== confirmPassword) ? "not-allowed" : "pointer"
+              }}>
+              {loading ? "処理中..." : isLogin ? "ログイン" : "登録する"}
+            </button>
+          </div>
+        </form>
+
+        {/* 区切り線 */}
+        <div style={{
+          display: "flex", alignItems: "center",
+          gap: "12px", marginTop: "16px"
+        }}>
+          <div style={{ flex: 1, height: "1px", background: "#333" }} />
+          <span style={{ color: "#888", fontSize: "13px" }}>または</span>
+          <div style={{ flex: 1, height: "1px", background: "#333" }} />
         </div>
 
-        {error && (
-          <p style={{ color: "#f44", fontSize: "14px", margin: "12px 0 0" }}>{error}</p>
-        )}
-
+        {/* Googleログインボタン */}
         <button
-          onClick={handleSubmit}
-          disabled={loading || (!isLogin && password !== confirmPassword)}
+          type="button"
+          onClick={handleGoogleLogin}
           style={{
             width: "100%", marginTop: "16px",
-            background: loading || (!isLogin && password !== confirmPassword) ? "#555" : "#1d9bf0",
-            color: "white", border: "none", borderRadius: "24px",
+            background: "#fff", color: "#000",
+            border: "none", borderRadius: "24px",
             padding: "12px", fontWeight: "bold",
-            fontSize: "16px",
-            cursor: loading || (!isLogin && password !== confirmPassword) ? "not-allowed" : "pointer"
+            fontSize: "16px", cursor: "pointer",
+            display: "flex", alignItems: "center",
+            justifyContent: "center", gap: "8px"
           }}>
-          {loading ? "処理中..." : isLogin ? "ログイン" : "登録する"}
+          <img
+            src="https://www.google.com/favicon.ico"
+            width="20" height="20"
+            alt="Google"
+          />
+          Googleで{isLogin ? "ログイン" : "登録"}
         </button>
       </div>
+
       <style jsx global>{`
-        /* デフォルト（PC画面） */
         .mobile-only {
           display: none !important;
         }
@@ -424,10 +487,9 @@ export default function AuthPage() {
           display: block !important;
         }
 
-        /* スマホ画面（1200px以下）の場合 */
         @media (max-width: 1200px) {
           .mobile-only {
-            display: flex !important; /* または block */
+            display: flex !important;
           }
           .pc-only {
             display: none !important;
