@@ -365,8 +365,7 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                         );
                     })}
                     <div style={{ padding: "16px", fontSize: "12px", color: "#666", display: "flex", gap: "12px" }}>
-                        <Link href="/terms" style={{ color: "#666", textDecoration: "none" }}>利用規約</Link>
-                        <Link href="/privacy" style={{ color: "#666", textDecoration: "none" }}>プライバシーポリシー</Link>
+                        <Link href="/legal" style={{ color: "#666", textDecoration: "none" }}>法的情報</Link>
                     </div>
                 </nav>
                 {/* ユーザー情報 */}
@@ -487,15 +486,17 @@ export default function Layout({ children, Tab }: { children: React.ReactNode; T
                     <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>開発中！</p>
                 </div>
 
-                <p style={{ color: "#888888", fontSize: "12px", margin: "0px" }}>
+                <p style={{ color: "#888", fontSize: "12px" }}>
                     Copyright © 2026{" "}
                     <a
-                        href="https://origo-ochre.vercel.app/profile?user=8mykg"
-                        style={{ color: "#4da6ff", textDecoration: "underline" }}
+                        href="https://x.com/fafogame5"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#1d9bf0", textDecoration: "none" }}
                     >
-                        tumayouzi_Dev.
-                    </a>{" "}
-                    All rights reserved.
+                        tumayouzi_Dev
+                    </a>
+                    . All rights reserved.
                 </p>
             </div>
 
