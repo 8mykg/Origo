@@ -15,8 +15,7 @@ const useIsMobile = () => {
   }, [])
   return isMobile
 }
-import { Reply } from "./components/Layout"
-import Layout, { PostItem, Post, User } from "./components/Layout"
+import Layout, { PostItem, Post, Reply, ReactionSummary, ReactionModal, User } from "./components/Layout"
 
 export default function Home() {
   const isMobile = useIsMobile()
@@ -26,6 +25,7 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<any | null>(null)
+  const [reactionTargetPost, setReactionTargetPost] = useState<any | null>(null)
   const router = useRouter()
   const [content, setContent] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -64,7 +64,7 @@ export default function Home() {
       .from("rooms")
       .select("id")
       .eq("show_in_tl", true)
-
+    const { data: reactionsData } = await supabase.from("reactions").select("*")
     const allowedRoomIds = allowedRooms?.map((r: { id: string }) => r.id) || []
 
     // 2. 「通常のTL投稿 (room_id が null)」を取得
@@ -98,6 +98,25 @@ export default function Home() {
 
     const merged = allPosts.map((post) => {
       const postUser = usersData?.find((u) => u.user_name === post.user_name)
+      // この投稿についたリアクションを取得
+      const postReactions = reactionsData?.filter((r) => r.post_id === post.id) || []
+      // 絵文字ごとにカウントと自分の投票状態を集計
+      const summaryMap: { [key: string]: { count: number; hasReacted: boolean } } = {}
+      postReactions.forEach((r) => {
+        if (!summaryMap[r.emoji]) {
+          summaryMap[r.emoji] = { count: 0, hasReacted: false }
+        }
+        summaryMap[r.emoji].count += 1
+        if (r.user_name === currentUser?.user_name) {
+          summaryMap[r.emoji].hasReacted = true
+        }
+      })
+
+      const reactions: ReactionSummary[] = Object.entries(summaryMap).map(([emoji, data]) => ({
+        emoji,
+        count: data.count,
+        hasReacted: data.hasReacted,
+      }))
       return {
         ...post,
         display_name: postUser?.display_name || post.user_name,
@@ -105,7 +124,8 @@ export default function Home() {
         likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
         liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
         bookmarked: bookmarksData?.some((b) => b.post_id === post.id && b.user_name === currentUser?.user_name),
-        bookmarks_count: bookmarksData?.filter((b) => b.post_id === post.id).length || 0 // ★ ここを追加！
+        bookmarks_count: bookmarksData?.filter((b) => b.post_id === post.id).length || 0, // ★ ここを追加！
+        reactions,
       }
     })
 
@@ -160,6 +180,33 @@ export default function Home() {
       setImageFile(null)
       fetchPosts() // 最新一覧を再取得
     }
+  }
+
+  const handleToggleReaction = async (post: Post, emoji: string) => {
+    if (!currentUser) return
+
+    // 既に自分が同じ絵文字を押しているかチェック
+    const existing = post.reactions?.find((r) => r.emoji === emoji && r.hasReacted)
+
+    if (existing) {
+      // 削除（トグル解除）
+      await supabase
+        .from("reactions")
+        .delete()
+        .eq("post_id", post.id)
+        .eq("user_name", currentUser.user_name)
+        .eq("emoji", emoji)
+    } else {
+      // 追加
+      await supabase.from("reactions").insert({
+        post_id: post.id,
+        user_name: currentUser.user_name,
+        emoji: emoji.trim().slice(0, 10), // 最大10文字制限（短文対応）
+      })
+    }
+
+    // 最新データを再取得して表示を更新
+    fetchPosts()
   }
 
   const handleLike = async (post: Post) => {
@@ -356,6 +403,7 @@ export default function Home() {
             onBookmark={handleBookmark}
             onDelete={handleDelete}
             onLinkClick={(url) => setTargetUrl(url)}
+            onReactionClick={(p) => setReactionTargetPost(p)}
           />
         ))}
       </div>
@@ -364,6 +412,13 @@ export default function Home() {
         onClose={() => setReplyingTo(null)}
         onSuccess={fetchPosts} // 送信成功したら投稿一覧を再取得！
       />
+      {reactionTargetPost && (
+        <ReactionModal
+          targetPost={reactionTargetPost}
+          onClose={() => setReactionTargetPost(null)}
+          onSuccess={() => fetchPosts()} // 最新状態を再取得
+        />
+      )}
     </Layout>
   )
 }

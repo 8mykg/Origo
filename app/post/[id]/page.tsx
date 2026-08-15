@@ -17,6 +17,7 @@ export default function PostDetailPage() {
   const [replies, setReplies] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
+  const [reactionTargetPost, setReactionTargetPost] = useState<any | null>(null)
 
   // 1. ユーザーセッションの初期化
   useEffect(() => {
@@ -458,6 +459,7 @@ export default function PostDetailPage() {
               onBookmark={handleBookmark}
               onDelete={(id) => handleDelete(id, false)}
               onLinkClick={(url) => setTargetUrl(url)}
+              onReactionClick={(p) => setReactionTargetPost(p)}
             />
           ))
         )}

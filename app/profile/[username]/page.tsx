@@ -5,7 +5,7 @@ import { supabase } from "../../lib/supabase"
 import { useRouter } from "next/navigation"
 import { FullScreenLoading } from "../../components/CSSTransformation"
 import { sendDeviceNotification } from "../../lib/notification"
-import Layout, { Reply, PostItem, Post, User } from "../../components/Layout"
+import Layout, { Reply, ReactionModal, PostItem, Post, User } from "../../components/Layout"
 // ----------------------------------------------------
 // 型定義（君の定義をそのまま適用！）
 // ----------------------------------------------------
@@ -55,6 +55,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const [posts, setPosts] = useState<Post[]>([])
     const router = useRouter()
     const [replyingTo, setReplyingTo] = useState<any | null>(null)
+    const [reactionTargetPost, setReactionTargetPost] = useState<any | null>(null)
     const [loading, setLoading] = useState(true)
     const [editing, setEditing] = useState(false)
     const [displayName, setDisplayName] = useState("")
@@ -152,33 +153,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             })
             setPosts(merged)
         }
-    }
-
-    const LinkedText = ({ text, onLinkClick }: { text: string; onLinkClick: (url: string) => void }) => {
-        const urlRegex = /(https?:\/\/[^\s]+)/g
-        const parts = text.split(urlRegex)
-
-        return (
-            <span>
-                {parts.map((part, i) =>
-                    urlRegex.test(part) ? (
-                        <span
-                            key={i}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onLinkClick(part)
-                            }}
-                            style={{ color: "#1d9bf0", cursor: "pointer", textDecoration: "underline" }}
-                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                        >
-                            {part}
-                        </span>
-                    ) : (
-                        part
-                    )
-                )}
-            </span>
-        )
     }
 
     // 3. フォロー数の取得（follows 型を活用）
@@ -532,8 +506,21 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                         onBookmark={handleBookmark}
                         onDelete={handleDelete}
                         onLinkClick={(url) => setTargetUrl(url)}
+                        onReactionClick={(p) => setReactionTargetPost(p)}
                     />
                 ))}
+                <Reply
+                    targetPost={replyingTo}
+                    onClose={() => setReplyingTo(null)}
+                    onSuccess={() => fetchPosts(profileUser, currentUser?.user_name)} // 送信成功したら投稿一覧を再取得！
+                />
+                {reactionTargetPost && (
+                    <ReactionModal
+                        targetPost={reactionTargetPost}
+                        onClose={() => setReactionTargetPost(null)}
+                        onSuccess={() => fetchPosts(profileUser, currentUser?.user_name)} // 最新状態を再取得
+                    />
+                )}
             </div>
             {/* 画面切り替え用のCSS記述 */}
             <style jsx global>{`

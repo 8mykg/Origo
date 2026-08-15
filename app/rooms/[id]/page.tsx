@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react"
 import { supabase } from "../../lib/supabase" // パスは環境に合わせて調整してください（例: "../lib/supabase" や "@/app/lib/supabase" など）
 import Link from "next/link"
-import Layout, { PostItem, Post, User } from "../../components/Layout"
+import Layout, { PostItem, Reply, ReactionModal, Post, User } from "../../components/Layout"
 
 interface Room {
   id: string
@@ -27,6 +27,8 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
   const [content, setContent] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<any | null>(null)
+  const [reactionTargetPost, setReactionTargetPost] = useState<any | null>(null)
   // 編集モード用の状態
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
@@ -203,6 +205,33 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
     } else {
       await supabase.from("bookmarks").insert({ post_id: post.id, user_name: currentUser.user_name })
     }
+    fetchRoomPosts()
+  }
+
+  const handleToggleReaction = async (post: Post, emoji: string) => {
+    if (!currentUser) return
+
+    // 既に自分が同じ絵文字を押しているかチェック
+    const existing = post.reactions?.find((r) => r.emoji === emoji && r.hasReacted)
+
+    if (existing) {
+      // 削除（トグル解除）
+      await supabase
+        .from("reactions")
+        .delete()
+        .eq("post_id", post.id)
+        .eq("user_name", currentUser.user_name)
+        .eq("emoji", emoji)
+    } else {
+      // 追加
+      await supabase.from("reactions").insert({
+        post_id: post.id,
+        user_name: currentUser.user_name,
+        emoji: emoji.trim().slice(0, 10), // 最大10文字制限（短文対応）
+      })
+    }
+
+    // 最新データを再取得して表示を更新
     fetchRoomPosts()
   }
 
@@ -569,12 +598,26 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
                 post={post}
                 currentUser={currentUser}
                 onLike={handleLike}
-                onReply={() => { }}
+                onReply={(p) => { setReplyingTo(p) }}
                 onBookmark={handleBookmark}
                 onDelete={handleDelete}
                 onLinkClick={() => { }}
+                onToggleReaction={handleToggleReaction}
+                onReactionClick={setReactionTargetPost}
               />
             ))
+          )}
+          <Reply
+            targetPost={replyingTo}
+            onClose={() => setReplyingTo(null)}
+            onSuccess={fetchRoomPosts} // 送信成功したら投稿一覧を再取得！
+          />
+          {reactionTargetPost && (
+            <ReactionModal
+              targetPost={reactionTargetPost}
+              onClose={() => setReactionTargetPost(null)}
+              onSuccess={() => fetchRoomPosts()} // 最新状態を再取得
+            />
           )}
         </div>
         {/* 画面切り替え用のCSS記述 */}

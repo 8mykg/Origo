@@ -32,6 +32,13 @@ export type Post = {
     bookmarks_count?: number
     reply_to_user?: string | null
     views_count?: number
+    reactions?: ReactionSummary[]
+}
+
+export type ReactionSummary = {
+    emoji: string
+    count: number
+    hasReacted: boolean // 自分がこのリアクションを押しているか
 }
 
 export type User = {
@@ -44,7 +51,7 @@ export type User = {
     role: string
 }
 
-type BarsProps = {
+export type BarsProps = {
     children: React.ReactNode
     Tab: string
 }
@@ -60,7 +67,7 @@ export type ReplyProps = {
 }
 
 // トレンドデータの型
-type Trend = {
+export type Trend = {
     tag: string
     count: number
 }
@@ -862,6 +869,8 @@ export function PostItem({
     onBookmark,
     onDelete,
     onLinkClick,
+    onToggleReaction,
+    onReactionClick,
     searchQuery,
 }: {
     post: Post
@@ -871,6 +880,8 @@ export function PostItem({
     onBookmark?: (post: Post) => void | Promise<void>
     onDelete?: (postId: string) => void
     onLinkClick?: (url: string) => void
+    onToggleReaction?: (post: Post, emoji: string) => void | Promise<void>
+    onReactionClick?: (post: Post) => void | Promise<void>
     searchQuery?: string
 }) {
     const router = useRouter()
@@ -1091,6 +1102,40 @@ export function PostItem({
                         <img src="/view.svg" alt="views" style={{ width: "18px", height: "18px" }} />
                         <span>{viewsCount}</span>
                     </div>
+                    {/* リアクションバッジ一覧 */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                        {post.reactions?.map((r) => (
+                            <button
+                                key={r.emoji}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onToggleReaction?.(post, r.emoji)
+                                }}
+                                style={{
+                                    background: r.hasReacted ? "#1d9bf022" : "#222",
+                                    border: r.hasReacted ? "1px solid #1d9bf0" : "1px solid #444",
+                                    color: r.hasReacted ? "#1d9bf0" : "#ccc",
+                                    borderRadius: "12px",
+                                    padding: "2px 8px",
+                                    fontSize: "12px",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                }}
+                            >
+                                <span>{r.emoji}</span>
+                                <span>{r.count}</span>
+                            </button>
+                        ))}
+
+                        {/* リアクション追加ボタン（よく使う定型絵文字ポップアップ等） */}
+                        {onReactionClick && (
+                            <button onClick={() => onReactionClick(post)}>
+                                + 😀
+                            </button>
+                        )}
+                    </div>
 
                     {/* 自分の投稿なら削除ボタン */}
                     {post.user_name === currentUser?.user_name && onDelete && (
@@ -1288,4 +1333,176 @@ export const sendReply = async ({
     }
 
     return true
+}
+
+export type ReactionModalProps = {
+    targetPost: any | null
+    onClose: () => void
+    onSuccess?: () => void
+}
+
+export function ReactionModal({ targetPost, onClose, onSuccess }: ReactionModalProps) {
+    const [input, setInput] = useState("")
+    const [submitting, setSubmitting] = useState(false)
+
+    if (!targetPost) return null
+
+    // 定番のクイックリアクションリスト
+    const quickReactions = ["👍", "❤️", "🔥", "😂", "😮", "😭", "草", "神", "わかる", "それな"]
+
+    // 送信処理（DBの reactions テーブルに保存）
+    const handleSendReaction = async (emojiToSend?: string) => {
+        const reactionText = (emojiToSend || input).trim()
+        if (!reactionText || submitting) return
+
+        setSubmitting(true)
+
+        // ログインユーザー情報の取得
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+            alert("ログインが必要です")
+            setSubmitting(false)
+            return
+        }
+
+        const { data: userData } = await supabase
+            .from("users")
+            .select("user_name")
+            .eq("id", session.user.id)
+            .single()
+
+        if (!userData) {
+            alert("ユーザー情報が見つかりません")
+            setSubmitting(false)
+            return
+        }
+
+        // reactions テーブルへ挿入 (最大10文字制限)
+        const { error } = await supabase.from("reactions").insert({
+            post_id: targetPost.id,
+            user_name: userData.user_name,
+            emoji: reactionText.slice(0, 10),
+        })
+
+        if (error) {
+            // UNIQUE制約違反（すでに同じリアクションを押している場合）
+            if (error.code === "23505") {
+                alert("すでにこのリアクションを追加しています")
+            } else {
+                alert("リアクションに失敗しました: " + error.message)
+            }
+        } else {
+            // 通知の追加（自分の投稿以外の場合）
+            if (targetPost.user_name !== userData.user_name) {
+                await supabase.from("notifications").insert({
+                    user_name: targetPost.user_name,
+                    actor_name: userData.user_name,
+                    type: "reaction",
+                    post_id: targetPost.id,
+                })
+            }
+
+            setInput("")
+            onClose()
+            if (onSuccess) onSuccess()
+        }
+
+        setSubmitting(false)
+    }
+
+    return (
+        <div
+            onClick={onClose}
+            style={{
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                background: "rgba(91, 112, 131, 0.4)", display: "flex",
+                justifyContent: "center", alignItems: "flex-start", paddingTop: "60px", zIndex: 1000
+            }}
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    background: "#000", border: "1px solid #333", borderRadius: "16px",
+                    width: "100%", maxWidth: "500px", padding: "20px", color: "#fff"
+                }}
+            >
+                {/* ヘッダー */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                    <span style={{ fontWeight: "bold", fontSize: "16px" }}>リアクションを追加</span>
+                    <button onClick={onClose} style={{ background: "none", border: "none", color: "#fff", fontSize: "18px", cursor: "pointer" }}>
+                        ✕
+                    </button>
+                </div>
+
+                {/* 対象ポストの簡易表示 */}
+                <div style={{ borderLeft: "2px solid #1d9bf0", paddingLeft: "12px", color: "#888", fontSize: "14px", marginBottom: "16px" }}>
+                    <span style={{ color: "#fff", fontWeight: "bold" }}>@{targetPost.user_name}</span>
+                    <p style={{ margin: "4px 0 0", color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {targetPost.content}
+                    </p>
+                </div>
+
+                {/* クイック絵文字・短文ボタン */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
+                    {quickReactions.map((item) => (
+                        <button
+                            key={item}
+                            onClick={() => handleSendReaction(item)}
+                            disabled={submitting}
+                            style={{
+                                background: "#222",
+                                border: "1px solid #444",
+                                color: "#fff",
+                                borderRadius: "20px",
+                                padding: "6px 12px",
+                                fontSize: "14px",
+                                cursor: "pointer",
+                                transition: "background 0.2s"
+                            }}
+                        >
+                            {item}
+                        </button>
+                    ))}
+                </div>
+
+                {/* 自由入力フォーム（絵文字や短い文字用） */}
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <input
+                        type="text"
+                        placeholder="絵文字や短いテキストを入力 (最大10文字)"
+                        maxLength={10}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        style={{
+                            flex: 1,
+                            background: "#111",
+                            color: "#fff",
+                            border: "1px solid #333",
+                            borderRadius: "8px",
+                            padding: "10px 12px",
+                            fontSize: "14px",
+                            outline: "none"
+                        }}
+                    />
+                    <button
+                        onClick={() => handleSendReaction()}
+                        disabled={submitting || !input.trim()}
+                        style={{
+                            background: !input.trim() ? "#555" : "#1d9bf0",
+                            color: "#fff",
+                            border: "none",
+                            padding: "10px 18px",
+                            borderRadius: "20px",
+                            fontWeight: "bold",
+                            fontSize: "14px",
+                            cursor: !input.trim() ? "not-allowed" : "pointer",
+                            whiteSpace: "nowrap"
+                        }}
+                    >
+                        {submitting ? "..." : "送信"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
 }

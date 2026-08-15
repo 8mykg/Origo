@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { supabase } from "../lib/supabase"
 import { FullScreenLoading } from "../components/CSSTransformation"
 import { sendDeviceNotification } from "../lib/notification"
-import Layout, { Reply, PostItem, Post, User } from "../components/Layout"
+import Layout, { PostItem, Post, Reply, ReactionModal, User } from "../components/Layout"
 
 // ★ 検索キーワードを太字（ハイライト）にするコンポーネント
 const HighlightedText = ({ text, query }: { text: string; query: string }) => {
@@ -39,6 +39,7 @@ function SearchContent() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
+  const [reactionTargetPost, setReactionTargetPost] = useState<any | null>(null)
 
   // URLのクエリが変わったら入力欄も更新
   useEffect(() => {
@@ -279,16 +280,29 @@ function SearchContent() {
                 post={post}
                 currentUser={currentUser}
                 onLike={handleLike}
-                onReply={(p: Post) => setReplyingTo(p)}
+                onReply={(p) => setReplyingTo(p)}
                 onBookmark={handleBookmark}
                 onDelete={handleDelete}
                 searchQuery={query}
+                onLinkClick={(url) => setTargetUrl(url)}
+                onReactionClick={(p) => setReactionTargetPost(p)}
               />
             ))
           )}
         </>
       )}
-      <Reply targetPost={replyingTo} onClose={() => setReplyingTo(null)} onSuccess={fetchSearchResults} />
+      <Reply
+        targetPost={replyingTo}
+        onClose={() => setReplyingTo(null)}
+        onSuccess={fetchSearchResults} // 送信成功したら投稿一覧を再取得！
+      />
+      {reactionTargetPost && (
+        <ReactionModal
+          targetPost={reactionTargetPost}
+          onClose={() => setReactionTargetPost(null)}
+          onSuccess={() => fetchSearchResults()} // 最新状態を再取得
+        />
+      )}
       {/* 画面切り替え用のCSS記述 */}
       <style jsx global>{`
         /* デフォルト（PC画面） */
@@ -319,7 +333,7 @@ export default function SearchPage() {
       <Layout
         Tab="search"
       >
-        <FullScreenLoading/>
+        <FullScreenLoading />
       </Layout>
     </div>}>
       <SearchContent />
