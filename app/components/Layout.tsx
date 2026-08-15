@@ -1131,7 +1131,10 @@ export function PostItem({
 
                         {/* リアクション追加ボタン（よく使う定型絵文字ポップアップ等） */}
                         {onReactionClick && (
-                            <button onClick={() => onReactionClick(post)}>
+                            <button onClick={(e) => {
+                                e.stopPropagation()
+                                onReactionClick(post)
+                            }}>
                                 + 😀
                             </button>
                         )}
