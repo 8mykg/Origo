@@ -5,6 +5,8 @@ import { supabase } from "./lib/supabase"
 import { useRouter } from "next/navigation"
 import { FullScreenLoading } from "./components/CSSTransformation"
 import { sendDeviceNotification } from "./lib/notification"
+import Layout, { PostItem, Post, Reply, ReactionSummary, ReactionModal, User } from "./components/Layout"
+
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
@@ -15,7 +17,6 @@ const useIsMobile = () => {
   }, [])
   return isMobile
 }
-import Layout, { PostItem, Post, Reply, ReactionSummary, ReactionModal, User } from "./components/Layout"
 
 export default function Home() {
   const isMobile = useIsMobile()
@@ -59,7 +60,7 @@ export default function Home() {
   useEffect(() => { if (currentUser) fetchPosts() }, [currentUser])
 
   const fetchPosts = async () => {
-    // 1. まず「TL同期フラグ(show_in_tl = true)」がオンになっている部屋のID一覧を取得
+    // 1. TL同期フラグがオンの部屋ID一覧を取得
     const { data: allowedRooms } = await supabase
       .from("rooms")
       .select("id")
@@ -67,47 +68,46 @@ export default function Home() {
     const { data: reactionsData } = await supabase.from("reactions").select("*")
     const allowedRoomIds = allowedRooms?.map((r: { id: string }) => r.id) || []
 
-    // 2. 「通常のTL投稿 (room_id が null)」を取得
+    // 2. 通常のTL投稿を取得
     const { data: normalPosts } = await supabase
       .from("posts")
       .select("*")
       .is("room_id", null)
 
-    // 3. 「TL同期が許可された部屋の投稿」を取得
+    // 3. 許可された部屋の投稿を取得
     let roomPosts: any[] = []
     if (allowedRoomIds.length > 0) {
       const { data: fetchedRoomPosts } = await supabase
         .from("posts")
         .select("*")
-        .in("room_id", allowedRoomIds) // 許可された部屋のIDのみ指定
+        .in("room_id", allowedRoomIds)
 
-      if (fetchedRoomPosts) {
-        roomPosts = fetchedRoomPosts
-      }
+      if (fetchedRoomPosts) roomPosts = fetchedRoomPosts
     }
 
-    // 4. 両方の投稿を合体させて、作成日時（created_at）の新しい順に並び替え
+    // 4. 並び替え
     const allPosts = [...(normalPosts || []), ...roomPosts].sort((a, b) => {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
 
-    // 5. イイネやユーザー情報の紐付け処理（既存の処理）
+    // 5. データ紐付け
     const { data: likesData } = await supabase.from("likes").select("*")
     const { data: usersData } = await supabase.from("users").select("*")
     const { data: bookmarksData } = await supabase.from("bookmarks").select("*")
 
     const merged = allPosts.map((post) => {
       const postUser = usersData?.find((u) => u.user_name === post.user_name)
-      // この投稿についたリアクションを取得
       const postReactions = reactionsData?.filter((r) => r.post_id === post.id) || []
-      // 絵文字ごとにカウントと自分の投票状態を集計
       const summaryMap: { [key: string]: { count: number; hasReacted: boolean } } = {}
+
       postReactions.forEach((r) => {
         if (!summaryMap[r.emoji]) {
           summaryMap[r.emoji] = { count: 0, hasReacted: false }
         }
         summaryMap[r.emoji].count += 1
-        if (r.user_name === currentUser?.user_name) {
+
+        // ★ 自分の user_name と一致している場合に true にする
+        if (currentUser && r.user_name === currentUser.user_name) {
           summaryMap[r.emoji].hasReacted = true
         }
       })
@@ -117,6 +117,7 @@ export default function Home() {
         count: data.count,
         hasReacted: data.hasReacted,
       }))
+
       return {
         ...post,
         display_name: postUser?.display_name || post.user_name,
@@ -124,7 +125,7 @@ export default function Home() {
         likes: likesData?.filter((l) => l.post_id === post.id).length || 0,
         liked: likesData?.some((l) => l.post_id === post.id && l.user_name === currentUser?.user_name),
         bookmarked: bookmarksData?.some((b) => b.post_id === post.id && b.user_name === currentUser?.user_name),
-        bookmarks_count: bookmarksData?.filter((b) => b.post_id === post.id).length || 0, // ★ ここを追加！
+        bookmarks_count: bookmarksData?.filter((b) => b.post_id === post.id).length || 0,
         reactions,
       }
     })
@@ -134,13 +135,11 @@ export default function Home() {
 
   const handlePost = async () => {
     const textContent = input.trim() || content.trim()
-    // 文字も画像も両方空っぽの場合、またはユーザー情報がない場合は中断
     if ((!textContent && !imageFile) || !currentUser || uploading) return
 
     setUploading(true)
     let imageUrl = null
-    // 1. 画像が選択されていれば Supabase Storage にアップロード
-    // 1. 画像があれば Supabase Storage にアップロード
+
     if (imageFile) {
       const fileExt = imageFile.name.split(".").pop()
       const fileName = `${Date.now()}_${Math.random()}.${fileExt}`
@@ -162,12 +161,11 @@ export default function Home() {
       imageUrl = publicUrlData.publicUrl
     }
 
-    // 2. 投稿データを1回だけ DB に保存
     const { error: postError } = await supabase.from("posts").insert({
       user_name: currentUser.user_name,
       content: textContent,
       image_url: imageUrl,
-      room_id: null, // 通常のTL投稿
+      room_id: null,
     })
 
     setUploading(false)
@@ -178,35 +176,63 @@ export default function Home() {
       setInput("")
       setContent("")
       setImageFile(null)
-      fetchPosts() // 最新一覧を再取得
+      fetchPosts()
     }
   }
 
+  // ★ 1人3回制限・削除・他人の絵文字押しに対応したリアクション関数
   const handleToggleReaction = async (post: Post, emoji: string) => {
-    if (!currentUser) return
+    if (!currentUser) {
+      alert("ログインが必要です")
+      return
+    }
 
-    // 既に自分が同じ絵文字を押しているかチェック
-    const existing = post.reactions?.find((r) => r.emoji === emoji && r.hasReacted)
+    // この投稿に自分が付けているリアクション一覧を取得
+    const myReactions = post.reactions?.filter((r) => r.hasReacted) || []
+    const alreadyReacted = myReactions.some((r) => r.emoji === emoji)
 
-    if (existing) {
-      // 削除（トグル解除）
-      await supabase
+    if (alreadyReacted) {
+      // 自分がすでに押している絵文字 ➔ 削除（トグル解除）
+      const { error } = await supabase
         .from("reactions")
         .delete()
         .eq("post_id", post.id)
         .eq("user_name", currentUser.user_name)
         .eq("emoji", emoji)
+
+      if (error) {
+        alert("削除に失敗しました: " + error.message)
+      } else {
+        fetchPosts()
+      }
     } else {
-      // 追加
-      await supabase.from("reactions").insert({
+      // 未押しの絵文字 ➔ 追加制限チェック
+      if (myReactions.length >= 3) {
+        alert("リアクションは1つの投稿につき3個までです")
+        return
+      }
+
+      const { error } = await supabase.from("reactions").insert({
         post_id: post.id,
         user_name: currentUser.user_name,
-        emoji: emoji.trim().slice(0, 10), // 最大10文字制限（短文対応）
+        emoji: emoji.trim().slice(0, 10),
       })
-    }
 
-    // 最新データを再取得して表示を更新
-    fetchPosts()
+      if (error) {
+        alert("追加に失敗しました: " + error.message)
+      } else {
+        // 通知登録（自分以外の投稿の場合）
+        if (post.user_name !== currentUser.user_name) {
+          await supabase.from("notifications").insert({
+            user_name: post.user_name,
+            actor_name: currentUser.user_name,
+            type: "reaction",
+            post_id: post.id,
+          })
+        }
+        fetchPosts()
+      }
+    }
   }
 
   const handleLike = async (post: Post) => {
@@ -217,7 +243,6 @@ export default function Home() {
       await supabase.from("likes").insert({ post_id: post.id, user_name: currentUser.user_name })
     }
     if (post.user_name !== currentUser.user_name) {
-      // ① DBに通知保存
       await supabase.from("notifications").insert({
         user_name: post.user_name,
         actor_name: currentUser.user_name,
@@ -225,7 +250,6 @@ export default function Home() {
         post_id: post.id,
       })
 
-      // ② 実デバイス通知を飛ばす（相手の端末で許可されていれば届きます）
       sendDeviceNotification("新しいいいね！", {
         body: `@${currentUser.user_name} さんがあなたのポストに「いいね」しました`,
       })
@@ -237,27 +261,21 @@ export default function Home() {
     if (!currentUser) return
 
     if (post.bookmarked) {
-      // ブックマーク解除
       await supabase
         .from("bookmarks")
         .delete()
         .eq("post_id", post.id)
         .eq("user_name", currentUser.user_name)
     } else {
-      // ブックマーク追加
       await supabase
         .from("bookmarks")
         .insert({ post_id: post.id, user_name: currentUser.user_name })
     }
-
-    // 再取得（TLや検索の再読込関数を呼ぶ）
     fetchPosts()
   }
 
   const handleDelete = async (postId: string) => {
-
     await supabase.from("likes").delete().eq("post_id", postId)
-
     const { error } = await supabase.from("posts").delete().eq("id", postId)
 
     if (error) {
@@ -285,19 +303,15 @@ export default function Home() {
   )
 
   if (loading) return (
-    <Layout
-      Tab="home"
-    >
+    <Layout Tab="home">
       <FullScreenLoading />
     </Layout>
   )
 
   return (
-    <Layout
-      Tab="home"
-    >
-      < div style={{ padding: "0px" }}>
-        {<div style={{ borderBottom: "2px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
+    <Layout Tab="home">
+      <div style={{ padding: "0px" }}>
+        <div style={{ borderBottom: "2px solid #333", padding: "16px 20px", display: "flex", gap: "12px" }}>
           <Avatar url={currentUser?.avatar_url} name={currentUser?.user_name || ""} />
           <div style={{ flex: 1 }}>
             <textarea
@@ -324,7 +338,7 @@ export default function Home() {
               }}>
                 {300 - input.length}
               </span>
-              {/* 選択した画像のプレビュー表示 */}
+
               {imageFile && (
                 <div style={{ position: "relative", marginBottom: "10px" }}>
                   <img
@@ -342,14 +356,10 @@ export default function Home() {
               )}
 
               <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "16px", marginTop: "10px" }}>
-                {/* 画像選択ボタン */}
                 <label style={{ cursor: "pointer", fontSize: "20px" }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    {/* カメラのボディ */}
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    {/* レンズ */}
                     <circle cx="12" cy="13" r="4" />
-                    {/* フラッシュ部分の点 */}
                     <line x1="19" y1="9" x2="19.01" y2="9" />
                   </svg>
                   <input
@@ -359,15 +369,12 @@ export default function Home() {
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
                         const file = e.target.files[0]
-                        const maxSize = 30 * 1024 * 1024 // 30MB (バイト単位: 30メガバイト)
-
-                        // ファイルサイズチェック
+                        const maxSize = 30 * 1024 * 1024
                         if (file.size > maxSize) {
                           alert("ンアー！(≧Д≦)ファイルサイズがデカすぎます！30MB以下の画像を選択してください！")
-                          e.target.value = "" // 選択をリセット
+                          e.target.value = ""
                           return
                         }
-
                         setImageFile(file)
                       }
                     }}
@@ -377,7 +384,6 @@ export default function Home() {
                   onClick={handlePost}
                   disabled={(!input.trim() && !content.trim() && !imageFile) || uploading}
                   style={{
-                    // 画像が選ばれているか文字があれば明るい青、なければ薄い灰色にする例
                     background: (input.trim() || content.trim() || imageFile) ? "#1d9bf0" : "#1d9bf088",
                     color: "#fff",
                     border: "none",
@@ -392,7 +398,8 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>}
+        </div>
+
         {posts.map((post) => (
           <PostItem
             key={post.id}
@@ -403,20 +410,23 @@ export default function Home() {
             onBookmark={handleBookmark}
             onDelete={handleDelete}
             onLinkClick={(url) => setTargetUrl(url)}
+            onToggleReaction={handleToggleReaction}
             onReactionClick={(p) => setReactionTargetPost(p)}
           />
         ))}
       </div>
+
       <Reply
         targetPost={replyingTo}
         onClose={() => setReplyingTo(null)}
-        onSuccess={fetchPosts} // 送信成功したら投稿一覧を再取得！
+        onSuccess={fetchPosts}
       />
+
       {reactionTargetPost && (
         <ReactionModal
           targetPost={reactionTargetPost}
           onClose={() => setReactionTargetPost(null)}
-          onSuccess={() => fetchPosts()} // 最新状態を再取得
+          onSuccess={() => fetchPosts()}
         />
       )}
     </Layout>

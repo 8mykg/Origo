@@ -880,8 +880,8 @@ export function PostItem({
     onBookmark?: (post: Post) => void | Promise<void>
     onDelete?: (postId: string) => void
     onLinkClick?: (url: string) => void
-    onToggleReaction?: (post: Post, emoji: string) => void | Promise<void>
-    onReactionClick?: (post: Post) => void | Promise<void>
+    onToggleReaction: (post: Post, emoji: string) => void
+    onReactionClick: (post: Post) => void | Promise<void>
     searchQuery?: string
 }) {
     const router = useRouter()
@@ -1104,24 +1104,25 @@ export function PostItem({
                     </div>
                     {/* リアクションバッジ一覧 */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
-                        {post.reactions?.map((r) => (
+                        {post.reactions?.map((r: any) => (
                             <button
                                 key={r.emoji}
                                 onClick={(e) => {
-                                    e.stopPropagation()
-                                    onToggleReaction?.(post, r.emoji)
+                                    e.stopPropagation() // 親要素のクリック発火（詳細遷移など）を防止
+                                    onToggleReaction(post, r.emoji)
                                 }}
                                 style={{
-                                    background: r.hasReacted ? "#1d9bf022" : "#222",
-                                    border: r.hasReacted ? "1px solid #1d9bf0" : "1px solid #444",
+                                    background: r.hasReacted ? "rgba(29, 155, 240, 0.15)" : "#181818",
+                                    border: r.hasReacted ? "1px solid #1d9bf0" : "1px solid #333",
                                     color: r.hasReacted ? "#1d9bf0" : "#ccc",
                                     borderRadius: "12px",
-                                    padding: "2px 8px",
+                                    padding: "3px 9px",
                                     fontSize: "12px",
                                     cursor: "pointer",
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "4px",
+                                    fontWeight: r.hasReacted ? "bold" : "normal",
                                 }}
                             >
                                 <span>{r.emoji}</span>
@@ -1129,15 +1130,24 @@ export function PostItem({
                             </button>
                         ))}
 
-                        {/* リアクション追加ボタン（よく使う定型絵文字ポップアップ等） */}
-                        {onReactionClick && (
-                            <button onClick={(e) => {
+                        {/* 追加用モーダルを開くボタン */}
+                        <button
+                            onClick={(e) => {
                                 e.stopPropagation()
                                 onReactionClick(post)
-                            }}>
-                                + 😀
-                            </button>
-                        )}
+                            }}
+                            style={{
+                                background: "none",
+                                border: "1px dashed #444",
+                                borderRadius: "12px",
+                                color: "#888",
+                                padding: "3px 8px",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                            }}
+                        >
+                            + リアクション
+                        </button>
                     </div>
 
                     {/* 自分の投稿なら削除ボタン */}
@@ -1357,6 +1367,14 @@ export function ReactionModal({ targetPost, onClose, onSuccess }: ReactionModalP
     const handleSendReaction = async (emojiToSend?: string) => {
         const reactionText = (emojiToSend || input).trim()
         if (!reactionText || submitting) return
+
+        // 1. 自分がこの投稿に既にいくつリアクションを付けているか確認
+        const myReactionCount = targetPost.reactions?.filter((r: any) => r.hasReacted).length || 0
+
+        if (myReactionCount >= 3) {
+            alert("リアクションは1つの投稿につき3個までです")
+            return
+        }
 
         setSubmitting(true)
 

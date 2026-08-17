@@ -150,7 +150,7 @@ body {
 .glow-card {
   background-color: #0d0d0d !important; /* 絶対に透けない漆黒 */
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  border-radius: 1px;
   
   /* ぼかし光と動きのスムーズな変化 */
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;

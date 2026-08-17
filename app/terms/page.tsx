@@ -5,8 +5,8 @@ import Link from "next/link"
 export default function TermsPage() {
   return (
     <div style={{ maxWidth: "800px", margin: "0 auto", padding: "24px 16px", color: "#e7e9ea" }}>
-      <Link href="/" style={{ color: "#1d9bf0", textDecoration: "none", fontSize: "14px" }}>
-        ← トップページに戻る
+      <Link href="/legal" style={{ color: "#1d9bf0", textDecoration: "none", fontSize: "14px" }}>
+        ← 法的情報に戻る
       </Link>
 
       <h1 style={{ fontSize: "24px", marginTop: "16px", marginBottom: "24px" }}>利用規約</h1>

@@ -285,6 +285,33 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         fetchPosts(profileUser, currentUser?.user_name)
     }
 
+    const handleToggleReaction = async (post: Post, emoji: string) => {
+        if (!currentUser) return
+
+        // 既に自分が同じ絵文字を押しているかチェック
+        const existing = post.reactions?.find((r) => r.emoji === emoji && r.hasReacted)
+
+        if (existing) {
+            // 削除（トグル解除）
+            await supabase
+                .from("reactions")
+                .delete()
+                .eq("post_id", post.id)
+                .eq("user_name", currentUser.user_name)
+                .eq("emoji", emoji)
+        } else {
+            // 追加
+            await supabase.from("reactions").insert({
+                post_id: post.id,
+                user_name: currentUser.user_name,
+                emoji: emoji.trim().slice(0, 10), // 最大10文字制限（短文対応）
+            })
+        }
+
+        // 最新データを再取得して表示を更新
+        fetchPosts(profileUser, currentUser?.user_name)
+    }
+
     // 8. 投稿削除
     const handleDelete = async (postId: string) => {
         await supabase.from("likes").delete().eq("post_id", postId)
@@ -506,6 +533,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                         onBookmark={handleBookmark}
                         onDelete={handleDelete}
                         onLinkClick={(url) => setTargetUrl(url)}
+                        onToggleReaction={handleToggleReaction}
                         onReactionClick={(p) => setReactionTargetPost(p)}
                     />
                 ))}

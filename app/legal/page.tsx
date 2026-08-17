@@ -38,6 +38,7 @@ export default function LegalHubPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {legalLinks.map((item) => (
           <Link
+            className="glow-card"
             key={item.title}
             href={item.href}
             style={{

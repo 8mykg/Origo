@@ -19,6 +19,7 @@ export default function AuthPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
+  const [isAgreed, setIsAgreed] = useState(false)
 
   // タブ切り替え時のリセット処理
   const handleTabChange = (toLogin: boolean) => {
@@ -424,7 +425,39 @@ export default function AuthPage() {
                 )}
               </div>
             )}
-
+            {/* 利用規約同意チェックボックス（新規登録のみ） */}
+            {!isLogin && (
+              <div style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "10px",
+                marginTop: "4px",
+                padding: "4px 2px"
+              }}>
+                <input
+                  type="checkbox"
+                  id="tos-agree"
+                  checked={isAgreed}
+                  onChange={(e) => setIsAgreed(e.target.checked)}
+                  style={{
+                    marginTop: "3px",
+                    cursor: "pointer",
+                    accentColor: "#1d9bf0" // チェックボックスの色をX/Twitter風の青に
+                  }}
+                />
+                <label htmlFor="tos-agree" style={{
+                  color: "#888",
+                  fontSize: "13px",
+                  lineHeight: "1.4",
+                  cursor: "pointer",
+                  userSelect: "none"
+                }}>
+                  {/* リンク先を /legal に統一 */}
+                  <a href="/legal" target="_blank" rel="noopener noreferrer" style={{ color: "#1d9bf0", textDecoration: "none" }}>利用規約とプライバシーポリシー</a>
+                  に同意します
+                </label>
+              </div>
+            )}
             {/* エラーメッセージ */}
             {error && (
               <p style={{ color: "#f44", fontSize: "14px", margin: "4px 0 0" }}>{error}</p>
@@ -433,17 +466,21 @@ export default function AuthPage() {
             {/* 送信ボタン */}
             <button
               type="submit"
-              disabled={loading || (!isLogin && password !== confirmPassword)}
+              // 1. disabled の条件に「新規登録かつ未同意」を追加
+              disabled={loading || (!isLogin && (password !== confirmPassword || !isAgreed))}
               style={{
                 width: "100%", marginTop: "16px",
-                background: loading || (!isLogin && password !== confirmPassword) ? "#555" : "#1d9bf0",
+                // 2. 背景色の条件にも反映（未同意の時はグレーの #555 になる）
+                background: loading || (!isLogin && (password !== confirmPassword || !isAgreed)) ? "#555" : "#1d9bf0",
                 color: "white", border: "none", borderRadius: "24px",
                 padding: "12px", fontWeight: "bold",
                 fontSize: "16px",
-                cursor: loading || (!isLogin && password !== confirmPassword) ? "not-allowed" : "pointer"
+                // 3. カーソル形状の条件にも反映（未同意の時は禁止マークになる）
+                cursor: loading || (!isLogin && (password !== confirmPassword || !isAgreed)) ? "not-allowed" : "pointer"
               }}>
               {loading ? "処理中..." : isLogin ? "ログイン" : "登録する"}
             </button>
+
           </div>
         </form>
 

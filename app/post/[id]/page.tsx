@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabase"
 import { FullScreenLoading } from "../../components/CSSTransformation"
 import { sendDeviceNotification } from "../../lib/notification"
-import Layout, { Reply, PostItem, Post, User, LinkedText } from "../../components/Layout"
+import Layout, { Reply, PostItem, Post, User, ReactionModal, LinkedText } from "../../components/Layout"
 
 export default function PostDetailPage() {
   const params = useParams()
@@ -18,6 +18,7 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<Post | null>(null)
   const [reactionTargetPost, setReactionTargetPost] = useState<any | null>(null)
+  const [viewsCount, setViewsCount] = useState<number>(0)
 
   // 1. ユーザーセッションの初期化
   useEffect(() => {
@@ -47,19 +48,45 @@ export default function PostDetailPage() {
     init()
   }, [])
 
-  // 2. ユーザー取得後に投稿データを取得
+  // 2. 閲覧ログの記録と閲覧数取得
+  useEffect(() => {
+    const recordAndFetchViews = async () => {
+      if (!postId) return
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        await supabase.from("post_views").upsert(
+          { post_id: postId, user_id: user.id },
+          { onConflict: "post_id,user_id", ignoreDuplicates: true }
+        )
+      }
+
+      const { count } = await supabase
+        .from("post_views")
+        .select("*", { count: "exact", head: true })
+        .eq("post_id", postId)
+
+      if (count !== null) {
+        setViewsCount(count)
+      }
+    }
+
+    recordAndFetchViews()
+  }, [postId])
+
+  // 3. 投稿データの取得
   useEffect(() => {
     if (currentUser && postId) {
       fetchPostAndReplies()
     }
   }, [currentUser, postId])
 
-  // 投稿＆返信データの一括取得処理
   const fetchPostAndReplies = async () => {
     if (!postId || !currentUser) return
     setLoading(true)
 
     try {
+      // 対象ポストに関連する周辺情報のみ取得
       const { data: likesData } = await supabase.from("likes").select("*")
       const { data: usersData } = await supabase.from("users").select("*")
       const { data: allPostsData } = await supabase.from("posts").select("*")
@@ -91,7 +118,7 @@ export default function PostDetailPage() {
           likes: likesData?.filter((l) => l.post_id === postData.id).length || 0,
           liked: likesData?.some((l) => l.post_id === postData.id && l.user_name === currentUser.user_name),
           bookmarked: bookmarksData?.some((b) => b.post_id === postData.id && b.user_name === currentUser.user_name),
-          bookmarks_count: bookmarksData?.filter((b) => b.post_id === postData.id).length || 0, // ★ ここを追加！
+          bookmarks_count: bookmarksData?.filter((b) => b.post_id === postData.id).length || 0,
           reply_count: replyCount,
           reply_to_user: replyToUser,
         })
@@ -99,7 +126,7 @@ export default function PostDetailPage() {
         setMainPost(null)
       }
 
-      // ② 子ポスト（返信一覧）の取得
+      // ② 返信（子ポスト）の取得
       const { data: replyData } = await supabase
         .from("posts")
         .select("*")
@@ -118,7 +145,7 @@ export default function PostDetailPage() {
             likes: likesData?.filter((l) => l.post_id === reply.id).length || 0,
             liked: likesData?.some((l) => l.post_id === reply.id && l.user_name === currentUser.user_name),
             bookmarked: bookmarksData?.some((b) => b.post_id === reply.id && b.user_name === currentUser.user_name),
-            bookmarks_count: bookmarksData?.filter((b) => b.post_id === reply.id).length || 0, // ★ ここを追加！
+            bookmarks_count: bookmarksData?.filter((b) => b.post_id === reply.id).length || 0,
             reply_count: subReplyCount,
           }
         })
@@ -133,50 +160,15 @@ export default function PostDetailPage() {
     }
   }
 
-  const [viewsCount, setViewsCount] = useState<number>(0)
-  const [hasViewed, setHasViewed] = useState<boolean>(false)
-
-  useEffect(() => {
-    const recordAndFetchViews = async () => {
-      // 1. 現在ログインしているユーザーを取得
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (user) {
-        // 2. 閲覧ログを追加（既に閲覧済みの場合はDB側で重複が無視されます）
-        await supabase.from("post_views").upsert(
-          { post_id: postId, user_id: user.id },
-          { onConflict: "post_id,user_id", ignoreDuplicates: true }
-        )
-      }
-
-      // 3. 最新の閲覧数を取得
-      const { count } = await supabase
-        .from("post_views")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", postId)
-
-      if (count !== null) {
-        setViewsCount(count)
-      }
-    }
-
-    if (postId) {
-      recordAndFetchViews()
-    }
-  }, [postId])
-
-  // いいね処理（Optimistic Update）
+  // いいね処理
   const handleLike = async (post: Post) => {
     if (!currentUser) return
 
     const isMain = post.id === mainPost?.id
     const nextLiked = !post.liked
-
-    // post.likes が undefined の場合は 0 として計算するお！
     const currentLikes = post.likes ?? 0
     const nextLikes = post.liked ? currentLikes - 1 : currentLikes + 1
 
-    // 1. UIを即座に更新
     if (isMain && mainPost) {
       setMainPost({ ...mainPost, liked: nextLiked, likes: nextLikes })
     } else {
@@ -185,7 +177,6 @@ export default function PostDetailPage() {
       )
     }
 
-    // 2. 裏でSupabaseと通信
     if (post.liked) {
       await supabase.from("likes").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
     } else {
@@ -193,7 +184,6 @@ export default function PostDetailPage() {
     }
 
     if (post.user_name !== currentUser.user_name) {
-      // ① DBに通知保存
       await supabase.from("notifications").insert({
         user_name: post.user_name,
         actor_name: currentUser.user_name,
@@ -201,45 +191,82 @@ export default function PostDetailPage() {
         post_id: post.id,
       })
 
-      // ② 実デバイス通知を飛ばす（相手の端末で許可されていれば届きます）
       sendDeviceNotification("新しいいいね！", {
         body: `@${currentUser.user_name} さんがあなたのポストに「いいね」しました`,
       })
     }
   }
-  // ブックマーク処理（即座に画面に反映してシームレス化）
+
+  // ブックマーク処理
   const handleBookmark = async (post: Post) => {
     if (!currentUser) return
 
     const isMain = post.id === mainPost?.id
     const nextBookmarked = !post.bookmarked
-
-    // ★ カウントの増減計算（現在の件数をベースに +1 または -1）
     const currentCount = post.bookmarks_count ?? 0
     const nextCount = nextBookmarked ? currentCount + 1 : Math.max(0, currentCount - 1)
 
-    // 1. UIを即座に更新
     if (isMain && mainPost) {
       setMainPost({
         ...mainPost,
         bookmarked: nextBookmarked,
-        bookmarks_count: nextCount // ★ 件数を更新
+        bookmarks_count: nextCount
       })
     } else {
       setReplies((prev) =>
         prev.map((r) =>
           r.id === post.id
-            ? { ...r, bookmarked: nextBookmarked, bookmarks_count: nextCount } // ★ 件数を更新
+            ? { ...r, bookmarked: nextBookmarked, bookmarks_count: nextCount }
             : r
         )
       )
     }
 
-    // 2. 裏でSupabaseと通信
     if (post.bookmarked) {
       await supabase.from("bookmarks").delete().eq("post_id", post.id).eq("user_name", currentUser.user_name)
     } else {
       await supabase.from("bookmarks").insert({ post_id: post.id, user_name: currentUser.user_name })
+    }
+  }
+
+  // リアクション処理
+  const handleToggleReaction = async (post: Post, emoji: string) => {
+    if (!currentUser) return
+
+    const myReactions = post.reactions?.filter((r) => r.hasReacted) || []
+    const alreadyReacted = myReactions.some((r) => r.emoji === emoji)
+
+    if (alreadyReacted) {
+      const { error } = await supabase
+        .from("reactions")
+        .delete()
+        .eq("post_id", post.id)
+        .eq("user_name", currentUser.user_name)
+        .eq("emoji", emoji)
+
+      if (error) alert("削除に失敗しました: " + error.message)
+    } else {
+      if (myReactions.length >= 3) {
+        alert("リアクションは1つの投稿につき3個までです")
+        return
+      }
+
+      const { error } = await supabase.from("reactions").insert({
+        post_id: post.id,
+        user_name: currentUser.user_name,
+        emoji: emoji.trim().slice(0, 10),
+      })
+
+      if (error) {
+        alert("追加に失敗しました: " + error.message)
+      } else if (post.user_name !== currentUser.user_name) {
+        await supabase.from("notifications").insert({
+          user_name: post.user_name,
+          actor_name: currentUser.user_name,
+          type: "reaction",
+          post_id: post.id,
+        })
+      }
     }
   }
 
@@ -309,10 +336,9 @@ export default function PostDetailPage() {
         <h1 style={{ fontSize: "18px", fontWeight: "bold", margin: 0 }}>ポスト</h1>
       </div>
 
-      {/* メインポスト（親ポストだけでかめの独自レイアウト） */}
+      {/* メインポスト */}
       <div style={{ padding: "16px", borderBottom: "1px solid #333" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-          {/* アバター */}
           <div
             style={{
               width: 48,
@@ -367,7 +393,8 @@ export default function PostDetailPage() {
           {formatDate(mainPost.created_at)}
         </div>
 
-        <div style={{ borderTop: "1px solid #222", paddingTop: "12px", display: "flex", gap: "24px", alignItems: "center" }}>
+        {/* アクションバー */}
+        <div style={{ borderTop: "1px solid #222", paddingTop: "12px", display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
           {/* いいねボタン */}
           <button
             onClick={() => handleLike(mainPost)}
@@ -397,10 +424,7 @@ export default function PostDetailPage() {
 
           {/* ブックマークボタン */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleBookmark(mainPost)
-            }}
+            onClick={() => handleBookmark(mainPost)}
             style={{
               background: "none", border: "none", cursor: "pointer",
               color: mainPost.bookmarked ? "#1d9bf0" : "#888",
@@ -408,7 +432,6 @@ export default function PostDetailPage() {
               padding: "4px 8px", borderRadius: "20px"
             }}
           >
-            {/* アイコンはSVGか文字で表現 */}
             <img
               src={mainPost.bookmarked ? "/bookmark-filled.svg" : "/bookmark.svg"}
               alt="bookmark"
@@ -416,16 +439,58 @@ export default function PostDetailPage() {
             />
             <span>{mainPost.bookmarks_count ?? 0}</span>
           </button>
-          {/* 閲覧数の表示箇所 */}
+
+          {/* 閲覧数表示 */}
           <div
             style={{
-              background: "none", border: "none", color: "#888",
-              fontSize: "14px", display: "flex",
-              alignItems: "center", gap: "6px", padding: "0px 0px", borderRadius: "20px"
-            }}>
+              color: "#888",
+              fontSize: "14px", display: "flex", alignItems: "center", gap: "6px",
+              padding: "4px 8px"
+            }}
+          >
             <img src="/view.svg" alt="views" style={{ width: "18px", height: "18px" }} />
-            <span>{viewsCount ?? 0}回表示</span>
+            <span>{viewsCount}回表示</span>
           </div>
+
+          {/* リアクション一覧 */}
+          {mainPost.reactions?.map((r: any) => (
+            <button
+              key={r.emoji}
+              onClick={() => handleToggleReaction(mainPost, r.emoji)}
+              style={{
+                background: r.hasReacted ? "rgba(29, 155, 240, 0.15)" : "#181818",
+                border: r.hasReacted ? "1px solid #1d9bf0" : "1px solid #333",
+                color: r.hasReacted ? "#1d9bf0" : "#ccc",
+                borderRadius: "12px",
+                padding: "3px 9px",
+                fontSize: "12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontWeight: r.hasReacted ? "bold" : "normal",
+              }}
+            >
+              <span>{r.emoji}</span>
+              <span>{r.count}</span>
+            </button>
+          ))}
+
+          {/* リアクション追加ボタン */}
+          <button
+            onClick={() => setReactionTargetPost(mainPost)}
+            style={{
+              background: "none",
+              border: "1px dashed #444",
+              borderRadius: "12px",
+              color: "#888",
+              padding: "3px 8px",
+              cursor: "pointer",
+              fontSize: "12px",
+            }}
+          >
+            + リアクション
+          </button>
 
           {/* 削除ボタン */}
           {mainPost.user_name === currentUser?.user_name && (
@@ -442,7 +507,7 @@ export default function PostDetailPage() {
         </div>
       </div>
 
-      {/* 返信（リプライ）一覧：ここは PostItem でスッキリ共通化 */}
+      {/* 返信（リプライ）一覧 */}
       <div>
         {replies.length === 0 ? (
           <div style={{ padding: "20px", color: "#888", textAlign: "center", fontSize: "14px" }}>
@@ -459,14 +524,14 @@ export default function PostDetailPage() {
               onBookmark={handleBookmark}
               onDelete={(id) => handleDelete(id, false)}
               onLinkClick={(url) => setTargetUrl(url)}
+              onToggleReaction={handleToggleReaction}
               onReactionClick={(p) => setReactionTargetPost(p)}
             />
           ))
         )}
       </div>
-      {/* 画面切り替え用のCSS記述 */}
+
       <style jsx global>{`
-        /* デフォルト（PC画面） */
         .mobile-only {
           display: none !important;
         }
@@ -474,22 +539,29 @@ export default function PostDetailPage() {
           display: block !important;
         }
 
-        /* スマホ画面（1200px以下）の場合 */
         @media (max-width: 1200px) {
           .mobile-only {
-            display: flex !important; /* または block */
+            display: flex !important;
           }
           .pc-only {
             display: none !important;
           }
         }
       `}</style>
-      {/* 返信モーダル */}
+
+      {/* モーダル群 */}
       <Reply
         targetPost={replyingTo}
         onClose={() => setReplyingTo(null)}
         onSuccess={fetchPostAndReplies}
       />
-    </Layout >
+      {reactionTargetPost && (
+        <ReactionModal
+          targetPost={reactionTargetPost}
+          onClose={() => setReactionTargetPost(null)}
+          onSuccess={() => fetchPostAndReplies()}
+        />
+      )}
+    </Layout>
   )
 }

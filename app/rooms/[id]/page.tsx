@@ -24,6 +24,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [targetUrl, setTargetUrl] = useState<string | null>(null)
   const [content, setContent] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -598,12 +599,12 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
                 post={post}
                 currentUser={currentUser}
                 onLike={handleLike}
-                onReply={(p) => { setReplyingTo(p) }}
+                onReply={(p) => setReplyingTo(p)}
                 onBookmark={handleBookmark}
                 onDelete={handleDelete}
-                onLinkClick={() => { }}
+                onLinkClick={(url) => setTargetUrl(url)}
                 onToggleReaction={handleToggleReaction}
-                onReactionClick={setReactionTargetPost}
+                onReactionClick={(post) => setReactionTargetPost(post)}
               />
             ))
           )}
